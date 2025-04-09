@@ -103,26 +103,28 @@ const styles = {
   },
   container: {
     display: "grid",
-    gridTemplateColumns: "1fr 1fr",
+    gridTemplateColumns: "1fr",
     gap: "2rem",
     padding: "2rem",
     backgroundColor: "#fff",
     borderRadius: "1rem",
     boxShadow: "0 20px 25px -5px rgba(0,0,0,0.1)",
     border: "1px solid #d1d5db",
+    width: "100%",
+    maxWidth: "800px",
   },
   header: {
     fontSize: "1.5rem",
     fontWeight: "bold",
     marginBottom: "1rem",
     color: "#374151",
+    textAlign: "center",
   },
   table: {
     border: "1px solid #e5e7eb",
     borderRadius: "0.5rem",
     padding: "1rem",
     backgroundColor: "#fff",
-    minWidth: "200px",
     listStyle: "none",
   },
   item: {
@@ -169,3 +171,8 @@ const styles = {
     cursor: "pointer",
   },
 };
+
+// Media query for larger screens (optional)
+if (window.innerWidth > 768) {
+  styles.container.gridTemplateColumns = "1fr 1fr";
+}
