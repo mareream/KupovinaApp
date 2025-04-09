@@ -1,15 +1,6 @@
-import { useState } from "react";
 import { useState, useEffect } from "react";
 
 export default function App() {
-  useEffect(() => {
-    localStorage.setItem("imamo", JSON.stringify(imamo));
-  }, [imamo]);
-  
-  useEffect(() => {
-    localStorage.setItem("kupiti", JSON.stringify(kupiti));
-  }, [kupiti]);
-  
   const [imamo, setImamo] = useState(() => {
     const stored = localStorage.getItem("imamo");
     return stored ? JSON.parse(stored) : ["Ljubav", "Hleb", "Jaja"];
@@ -19,6 +10,14 @@ export default function App() {
     const stored = localStorage.getItem("kupiti");
     return stored ? JSON.parse(stored) : ["Mleko"];
   });
+
+  useEffect(() => {
+    localStorage.setItem("imamo", JSON.stringify(imamo));
+  }, [imamo]);
+  
+  useEffect(() => {
+    localStorage.setItem("kupiti", JSON.stringify(kupiti));
+  }, [kupiti]);
 
   const [newItem, setNewItem] = useState("");
 
