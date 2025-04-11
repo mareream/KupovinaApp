@@ -18,7 +18,7 @@ export default function Login() {
 
     if (USERS[username] && USERS[username] === password) {
       setError("");
-      navigate("app");
+      navigate("app", { state: { username } });
     } else {
       setError("Invalid username or password");
     }

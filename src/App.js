@@ -1,11 +1,14 @@
 import { useState, useEffect } from "react";
 import { database, ref, set, onValue } from "./firebase"; // make sure this path matches your project
+import { useLocation } from "react-router-dom";
 
 export default function App() {
   const [imamo, setImamo] = useState([]);
   const [kupiti, setKupiti] = useState([]);
   const [newItem, setNewItem] = useState("");
   const [initialized, setInitialized] = useState(false);
+  const location = useLocation();
+  const username = location.state?.username || "unknown";
 
   // Load data from Firebase once
   useEffect(() => {
@@ -30,7 +33,7 @@ export default function App() {
 
   const moveItem = (item, fromList, setFrom, toList, setTo) => {
     if (!toList.includes(item)) {
-      setFrom((prev) => prev.filter((i) => i !== item));
+      setFrom((prev) => prev.filter((i) => i.name !== item.name));
       setTo((prev) => [...prev, item]);
     }
   };
@@ -41,9 +44,15 @@ export default function App() {
 
   const addItem = () => {
     if (newItem.trim() !== "") {
-      setKupiti((prev) => [...prev, newItem.trim()]);
+      const item = { name: newItem.trim(), addedBy: username };
+      setKupiti((prev) => [...prev, item]);
       setNewItem("");
     }
+  };
+
+  const userColors = {
+    Mare: "blue",
+    Caka: "deeppink",
   };
 
   return (
@@ -55,11 +64,20 @@ export default function App() {
           <ul style={styles.table}>
             {imamo.map((item) => (
               <li
-                key={item}
+                key={item.name}
                 style={styles.item}
                 onClick={() => moveItem(item, imamo, setImamo, kupiti, setKupiti)}
               >
-                <span style={styles.itemText}>{item}</span>
+                <div style={styles.itemText}>
+                  <strong>{item.name}</strong>
+                  <br />
+                  <small>
+                    added by{" "}
+                    <span style={{ color: userColors[item.addedBy] || "#6b7280" }}>
+                      {item.addedBy}
+                    </span>
+                  </small>
+                </div>
                 <button
                   style={styles.deleteButton}
                   onClick={(e) => {
@@ -80,11 +98,20 @@ export default function App() {
           <ul style={styles.table}>
             {kupiti.map((item) => (
               <li
-                key={item}
+                key={item.name}
                 style={styles.item}
                 onClick={() => moveItem(item, kupiti, setKupiti, imamo, setImamo)}
               >
-                <span style={styles.itemText}>{item}</span>
+                <div style={styles.itemText}>
+                  <strong>{item.name}</strong>
+                  <br />
+                  <small>
+                    added by{" "}
+                    <span style={{ color: userColors[item.addedBy] || "#6b7280" }}>
+                      {item.addedBy}
+                    </span>
+                  </small>
+                </div>
                 <button
                   style={styles.deleteButton}
                   onClick={(e) => {
