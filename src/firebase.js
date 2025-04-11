@@ -6,7 +6,7 @@ import { getAnalytics } from "firebase/analytics";
 const firebaseConfig = {
   apiKey: "AIzaSyCZCwSQo62zd_gmoUUKGQ90kQnIKkJbzDs",
   authDomain: "kupovinaapp-53642.firebaseapp.com",
-  //databaseURL: "https://YOUR_APP.firebaseio.com",
+  databaseURL: "https://kupovinaapp-53642-default-rtdb.europe-west1.firebasedatabase.app/",
   projectId: "kupovinaapp-53642",
   storageBucket: "kupovinaapp-53642.firebasestorage.app",
   messagingSenderId: "835733140276",

@@ -1,25 +1,32 @@
 import { useState, useEffect } from "react";
+import { database, ref, set, onValue } from "./firebase";
 
 export default function App() {
-  const [imamo, setImamo] = useState(() => {
-    const stored = localStorage.getItem("imamo");
-    return stored ? JSON.parse(stored) : ["Ljubav", "Hleb", "Jaja"];
-  });
-
-  const [kupiti, setKupiti] = useState(() => {
-    const stored = localStorage.getItem("kupiti");
-    return stored ? JSON.parse(stored) : ["Mleko"];
-  });
-
-  useEffect(() => {
-    localStorage.setItem("imamo", JSON.stringify(imamo));
-  }, [imamo]);
-  
-  useEffect(() => {
-    localStorage.setItem("kupiti", JSON.stringify(kupiti));
-  }, [kupiti]);
-
+  const [imamo, setImamo] = useState([]);
+  const [kupiti, setKupiti] = useState([]);
   const [newItem, setNewItem] = useState("");
+
+  // Load data from Firebase
+  useEffect(() => {
+    const imamoRef = ref(database, "imamo");
+    const kupitiRef = ref(database, "kupiti");
+
+    onValue(imamoRef, (snapshot) => {
+      setImamo(snapshot.val() || []);
+    });
+    onValue(kupitiRef, (snapshot) => {
+      setKupiti(snapshot.val() || []);
+    });
+  }, []);
+
+  // Save to Firebase when state changes
+  useEffect(() => {
+    set(ref(database, "imamo"), imamo);
+  }, [imamo]);
+
+  useEffect(() => {
+    set(ref(database, "kupiti"), kupiti);
+  }, [kupiti]);
 
   const moveItem = (item, fromSetter, toSetter) => {
     toSetter((prev) => [...prev, item]);
