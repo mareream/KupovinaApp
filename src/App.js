@@ -104,7 +104,7 @@ export default function App() {
               type="text"
               value={newItem}
               onChange={(e) => setNewItem(e.target.value)}
-              placeholder="Enter item name"
+              placeholder="Enter item name!"
               style={styles.input}
             />
             <button style={styles.addButton} onClick={addItem}>
@@ -128,28 +128,26 @@ const styles = {
   },
   container: {
     display: "grid",
-    gridTemplateColumns: "1fr",
+    gridTemplateColumns: "1fr 1fr",
     gap: "2rem",
     padding: "2rem",
     backgroundColor: "#fff",
     borderRadius: "1rem",
     boxShadow: "0 20px 25px -5px rgba(0,0,0,0.1)",
     border: "1px solid #d1d5db",
-    width: "100%",
-    maxWidth: "800px",
   },
   header: {
     fontSize: "1.5rem",
     fontWeight: "bold",
     marginBottom: "1rem",
     color: "#374151",
-    textAlign: "center",
   },
   table: {
     border: "1px solid #e5e7eb",
     borderRadius: "0.5rem",
     padding: "1rem",
     backgroundColor: "#fff",
+    minWidth: "200px",
     listStyle: "none",
   },
   item: {
@@ -181,7 +179,7 @@ const styles = {
     padding: "0.75rem",
     border: "1px solid #d1d5db",
     borderRadius: "0.5rem",
-    width: "100%",
+    width: "92%",
     marginBottom: "0.5rem",
     fontSize: "1rem",
   },
