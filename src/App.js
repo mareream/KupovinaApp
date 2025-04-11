@@ -128,7 +128,7 @@ const styles = {
   },
   container: {
     display: "grid",
-    gridTemplateColumns: "1fr 1fr",
+    gridTemplateColumns: "1fr",
     gap: "2rem",
     padding: "2rem",
     backgroundColor: "#fff",
