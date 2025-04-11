@@ -57,7 +57,7 @@ export default function App() {
               <li
                 key={item}
                 style={styles.item}
-                onClick={() => moveItem(item, setImamo, setKupiti)}
+                onClick={() => moveItem(item, imamo, setImamo, kupiti, setKupiti)}
               >
                 <span style={styles.itemText}>{item}</span>
                 <button
@@ -82,7 +82,7 @@ export default function App() {
               <li
                 key={item}
                 style={styles.item}
-                onClick={() => moveItem(item, setKupiti, setImamo)}
+                onClick={() => moveItem(item, kupiti, setKupiti, imamo, setImamo)}
               >
                 <span style={styles.itemText}>{item}</span>
                 <button
