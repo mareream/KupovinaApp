@@ -128,19 +128,22 @@ const styles = {
   },
   container: {
     display: "grid",
-    gridTemplateColumns: "1fr",
+    gridTemplateColumns: "1fr", // Keep a single column for layout
     gap: "2rem",
     padding: "2rem",
     backgroundColor: "#fff",
     borderRadius: "1rem",
     boxShadow: "0 20px 25px -5px rgba(0,0,0,0.1)",
     border: "1px solid #d1d5db",
+    width: "100%",
+    maxWidth: "600px", // Limit the max width to prevent layout from stretching too much on large screens
   },
   header: {
     fontSize: "1.5rem",
     fontWeight: "bold",
     marginBottom: "1rem",
     color: "#374151",
+    textAlign: "center", // Center the header text
   },
   table: {
     border: "1px solid #e5e7eb",
@@ -149,6 +152,7 @@ const styles = {
     backgroundColor: "#fff",
     minWidth: "200px",
     listStyle: "none",
+    maxWidth: "100%", // Ensure table uses full width of its container
   },
   item: {
     padding: "0.75rem",
@@ -174,12 +178,13 @@ const styles = {
   },
   inputArea: {
     marginTop: "1rem",
+    width: "100%", // Ensure the input area takes the full width of the container
   },
   input: {
     padding: "0.75rem",
     border: "1px solid #d1d5db",
     borderRadius: "0.5rem",
-    width: "92%",
+    width: "92%", // Set input width to 100% so it takes full container width
     marginBottom: "0.5rem",
     fontSize: "1rem",
   },
@@ -188,7 +193,7 @@ const styles = {
     backgroundColor: "#3b82f6",
     color: "white",
     borderRadius: "0.5rem",
-    width: "100%",
+    width: "100%", // Set button width to 100% so it matches the input
     fontWeight: "500",
     border: "none",
     cursor: "pointer",
