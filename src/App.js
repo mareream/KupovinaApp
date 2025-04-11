@@ -1,40 +1,36 @@
 import { useState, useEffect } from "react";
-import { database, ref, set, onValue } from "./firebase";
+import { database, ref, set, onValue } from "./firebase"; // make sure this path matches your project
 
 export default function App() {
   const [imamo, setImamo] = useState([]);
   const [kupiti, setKupiti] = useState([]);
   const [newItem, setNewItem] = useState("");
 
-  // Load data from Firebase
+  // Load data from Firebase once
   useEffect(() => {
-    const imamoRef = ref(database, "imamo");
-    const kupitiRef = ref(database, "kupiti");
-
-    onValue(imamoRef, (snapshot) => {
-      setImamo(snapshot.val() || []);
-    });
-    onValue(kupitiRef, (snapshot) => {
-      setKupiti(snapshot.val() || []);
+    const dataRef = ref(database, "shoppingList");
+    onValue(dataRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        setImamo(data.imamo || []);
+        setKupiti(data.kupiti || []);
+      }
     });
   }, []);
 
-  // Save to Firebase when state changes
+  // Save data to Firebase whenever state changes
   useEffect(() => {
-    set(ref(database, "imamo"), imamo);
-  }, [imamo]);
+    const dataRef = ref(database, "shoppingList");
+    set(dataRef, { imamo, kupiti });
+  }, [imamo, kupiti]);
 
-  useEffect(() => {
-    set(ref(database, "kupiti"), kupiti);
-  }, [kupiti]);
-
-  const moveItem = (item, fromSetter, toSetter) => {
-    toSetter((prev) => [...prev, item]);
-    fromSetter((prev) => prev.filter((i) => i !== item));
+  const moveItem = (item, fromList, setFrom, setTo) => {
+    setFrom((prev) => prev.filter((i) => i !== item));
+    setTo((prev) => [...prev, item]);
   };
 
-  const deleteItem = (item, fromSetter) => {
-    fromSetter((prev) => prev.filter((i) => i !== item));
+  const deleteItem = (item, setList) => {
+    setList((prev) => prev.filter((i) => i !== item));
   };
 
   const addItem = () => {
