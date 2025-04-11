@@ -5,6 +5,7 @@ export default function App() {
   const [imamo, setImamo] = useState([]);
   const [kupiti, setKupiti] = useState([]);
   const [newItem, setNewItem] = useState("");
+  const [initialized, setInitialized] = useState(false);
 
   // Load data from Firebase once
   useEffect(() => {
@@ -15,18 +16,23 @@ export default function App() {
         setImamo(data.imamo || []);
         setKupiti(data.kupiti || []);
       }
+      setInitialized(true);
     });
   }, []);
 
-  // Save data to Firebase whenever state changes
+  // Save data to Firebase only after initial load
   useEffect(() => {
-    const dataRef = ref(database, "shoppingList");
-    set(dataRef, { imamo, kupiti });
-  }, [imamo, kupiti]);
+    if (initialized) {
+      const dataRef = ref(database, "shoppingList");
+      set(dataRef, { imamo, kupiti });
+    }
+  }, [imamo, kupiti, initialized]);
 
-  const moveItem = (item, fromList, setFrom, setTo) => {
-    setFrom((prev) => prev.filter((i) => i !== item));
-    setTo((prev) => [...prev, item]);
+  const moveItem = (item, fromList, setFrom, toList, setTo) => {
+    if (!toList.includes(item)) {
+      setFrom((prev) => prev.filter((i) => i !== item));
+      setTo((prev) => [...prev, item]);
+    }
   };
 
   const deleteItem = (item, setList) => {
