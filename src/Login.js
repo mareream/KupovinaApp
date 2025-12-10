@@ -1,26 +1,59 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { auth, signInWithEmailAndPassword } from "./firebase";
 
-const USERS = {
-  Caka: "VolimBibu",
-  Mare: "VolimBibu",
+// Map display names to email addresses
+const USER_EMAILS = {
+  Caka: "caka@kupovinaapp.com",
+  Mare: "mare@kupovinaapp.com",
 };
 
 export default function Login() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const navigate = useNavigate();
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
+    setError("");
+    setLoading(true);
 
-    if (USERS[username] && USERS[username] === password) {
-      setError("");
-      navigate("app", { state: { username } });
-    } else {
-      setError("Invalid username or password");
+    // Get email for the username
+    const email = USER_EMAILS[username];
+    
+    if (!email) {
+      setError("Invalid username");
+      setLoading(false);
+      return;
+    }
+
+    try {
+      // Sign in with Firebase Auth
+      await signInWithEmailAndPassword(auth, email, password);
+      
+      // Navigate to app on success
+      navigate("/app", { state: { username } });
+    } catch (err) {
+      // Handle different error types
+      let errorMessage = "Login failed. Please try again.";
+      
+      if (err.code === "auth/invalid-credential" || err.code === "auth/wrong-password") {
+        errorMessage = "Invalid username or password";
+      } else if (err.code === "auth/user-not-found") {
+        errorMessage = "User not found";
+      } else if (err.code === "auth/too-many-requests") {
+        errorMessage = "Too many failed attempts. Please try again later.";
+      } else if (err.code === "auth/network-request-failed") {
+        errorMessage = "Network error. Please check your connection.";
+      }
+      
+      setError(errorMessage);
+      console.error("Login error:", err);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -30,10 +63,11 @@ export default function Login() {
       <form onSubmit={handleLogin} style={styles.form}>
         <input
           type="text"
-          placeholder="Username"
+          placeholder="Username (Caka or Mare)"
           value={username}
           onChange={(e) => setUsername(e.target.value)}
           style={styles.input}
+          disabled={loading}
         />
         <input
           type="password"
@@ -41,9 +75,18 @@ export default function Login() {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           style={styles.input}
+          disabled={loading}
         />
-        <button type="submit" style={styles.button}>
-          Login
+        <button 
+          type="submit" 
+          style={{
+            ...styles.button,
+            opacity: loading ? 0.6 : 1,
+            cursor: loading ? "not-allowed" : "pointer"
+          }}
+          disabled={loading}
+        >
+          {loading ? "Logging in..." : "Login"}
         </button>
         {error && <p style={styles.error}>{error}</p>}
       </form>
@@ -88,10 +131,12 @@ const styles = {
     cursor: "pointer",
     fontSize: "1rem",
     fontWeight: "500",
+    transition: "background-color 0.2s",
   },
   error: {
     color: "#ef4444",
     marginTop: "0.5rem",
     fontSize: "0.9rem",
+    textAlign: "center",
   },
 };
