@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { database, ref, set, onValue, remove, auth, signOut, onAuthStateChanged } from "./firebase";
 import { useLocation, useNavigate } from "react-router-dom";
 
@@ -8,10 +8,16 @@ export default function App() {
   const [newItem, setNewItem] = useState("");
   const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [onlineUsers, setOnlineUsers] = useState({});
+  const [error, setError] = useState(null);
+  const [undoStack, setUndoStack] = useState([]);
+  const [showUndo, setShowUndo] = useState(false);
+  const [animatingItems, setAnimatingItems] = useState(new Set());
   
   const location = useLocation();
   const navigate = useNavigate();
   const username = location.state?.username || "unknown";
+  const undoTimeoutRef = useRef(null);
 
   // Check authentication status
   useEffect(() => {
@@ -38,19 +44,79 @@ export default function App() {
         setImamo(data.imamo || {});
         setKupiti(data.kupiti || {});
       } else {
-        // Initialize empty structure if no data exists
         setImamo({});
         setKupiti({});
       }
+      setError(null);
     }, (error) => {
       console.error("Error reading from Firebase:", error);
+      setError("Failed to load data. Please refresh the page.");
     });
 
     return () => unsubscribe();
   }, [currentUser]);
 
+  // User presence tracking
+  useEffect(() => {
+    if (!currentUser || !username) return;
+
+    const presenceRef = ref(database, `presence/${username}`);
+
+    const setOnline = async () => {
+      try {
+        await set(presenceRef, {
+          username: username,
+          online: true,
+          lastSeen: Date.now()
+        });
+      } catch (err) {
+        console.error("Error setting presence:", err);
+      }
+    };
+
+    const setOffline = async () => {
+      try {
+        await set(presenceRef, {
+          username: username,
+          online: false,
+          lastSeen: Date.now()
+        });
+      } catch (err) {
+        console.error("Error setting offline:", err);
+      }
+    };
+
+    setOnline();
+
+    const presenceListener = onValue(ref(database, "presence"), (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        setOnlineUsers(data);
+      }
+    });
+
+    window.addEventListener("beforeunload", setOffline);
+    const intervalId = setInterval(setOnline, 30000);
+
+    return () => {
+      setOffline();
+      window.removeEventListener("beforeunload", setOffline);
+      clearInterval(intervalId);
+      presenceListener();
+    };
+  }, [currentUser, username]);
+
   const handleLogout = async () => {
+    if (!window.confirm("Are you sure you want to logout?")) return;
+
     try {
+      const presenceRef = ref(database, `presence/${username}`);
+      await set(presenceRef, {
+        username: username,
+        online: false,
+        lastSeen: Date.now()
+      });
+      
       await signOut(auth);
       navigate("/");
     } catch (error) {
@@ -58,57 +124,233 @@ export default function App() {
     }
   };
 
-  // Move item from one list to another
-  const moveItem = async (itemId, item, fromList, toList) => {
+  const itemExists = (itemName) => {
+    const normalizedName = itemName.trim().toLowerCase();
+    
+    const existsInImamo = Object.values(imamo).some(
+      item => item.name.toLowerCase() === normalizedName
+    );
+    const existsInKupiti = Object.values(kupiti).some(
+      item => item.name.toLowerCase() === normalizedName
+    );
+    
+    return existsInImamo || existsInKupiti;
+  };
+
+  // Show undo notification
+  const showUndoNotification = (undoAction) => {
+    setUndoStack([undoAction]);
+    setShowUndo(true);
+
+    if (undoTimeoutRef.current) {
+      clearTimeout(undoTimeoutRef.current);
+    }
+
+    undoTimeoutRef.current = setTimeout(() => {
+      setShowUndo(false);
+      setUndoStack([]);
+    }, 5000);
+  };
+
+  // Undo last action
+  const performUndo = async () => {
+    if (undoStack.length === 0) return;
+
+    const action = undoStack[0];
+    
     try {
-      const updates = {};
+      if (action.type === "move") {
+        // Move item back
+        const toRef = ref(database, `shoppingList/${action.fromList}/${action.itemId}`);
+        await set(toRef, action.item);
+        
+        const fromRef = ref(database, `shoppingList/${action.toList}/${action.itemId}`);
+        await remove(fromRef);
+      } else if (action.type === "delete") {
+        // Restore deleted item
+        const itemRef = ref(database, `shoppingList/${action.listName}/${action.itemId}`);
+        await set(itemRef, action.item);
+      }
+
+      setShowUndo(false);
+      setUndoStack([]);
       
-      // Remove from source list
-      updates[`shoppingList/${fromList}/${itemId}`] = null;
+      if (undoTimeoutRef.current) {
+        clearTimeout(undoTimeoutRef.current);
+      }
+    } catch (error) {
+      console.error("Error undoing action:", error);
+      setError("Failed to undo action.");
+    }
+  };
+
+  // Move item from one list to another (with animation)
+  const moveItem = async (itemId, item, fromList, toList) => {
+    // Add animation
+    setAnimatingItems(prev => new Set(prev).add(itemId));
+    
+    setTimeout(() => {
+      setAnimatingItems(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(itemId);
+        return newSet;
+      });
+    }, 300);
+
+    // Optimistic update
+    const updatedFrom = { ...eval(fromList) };
+    const updatedTo = { ...eval(toList) };
+    
+    delete updatedFrom[itemId];
+    updatedTo[itemId] = item;
+    
+    if (fromList === "imamo") {
+      setImamo(updatedFrom);
+      setKupiti(updatedTo);
+    } else {
+      setKupiti(updatedFrom);
+      setImamo(updatedTo);
+    }
+
+    try {
+      const toRef = ref(database, `shoppingList/${toList}/${itemId}`);
+      await set(toRef, item);
       
-      // Add to destination list with same ID
-      updates[`shoppingList/${toList}/${itemId}`] = item;
-      
-      // Apply both updates atomically
-      await set(ref(database), updates);
+      const fromRef = ref(database, `shoppingList/${fromList}/${itemId}`);
+      await remove(fromRef);
+
+      // Add to undo stack
+      showUndoNotification({
+        type: "move",
+        itemId,
+        item,
+        fromList,
+        toList,
+        itemName: item.name
+      });
     } catch (error) {
       console.error("Error moving item:", error);
-      alert("Failed to move item. Please try again.");
+      setError("Failed to move item. Changes reverted.");
+      
+      if (fromList === "imamo") {
+        setImamo(prev => ({ ...prev, [itemId]: item }));
+        setKupiti(prev => {
+          const reverted = { ...prev };
+          delete reverted[itemId];
+          return reverted;
+        });
+      } else {
+        setKupiti(prev => ({ ...prev, [itemId]: item }));
+        setImamo(prev => {
+          const reverted = { ...prev };
+          delete reverted[itemId];
+          return reverted;
+        });
+      }
     }
   };
 
   // Delete item from a list
-  const deleteItem = async (itemId, listName) => {
+  const deleteItem = async (itemId, listName, itemName) => {
+    if (!window.confirm(`Delete "${itemName}"?`)) return;
+
+    const itemToDelete = listName === "imamo" ? imamo[itemId] : kupiti[itemId];
+
+    // Add animation
+    setAnimatingItems(prev => new Set(prev).add(itemId));
+    
+    setTimeout(() => {
+      setAnimatingItems(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(itemId);
+        return newSet;
+      });
+    }, 300);
+
+    // Optimistic update
+    if (listName === "imamo") {
+      setImamo(prev => {
+        const updated = { ...prev };
+        delete updated[itemId];
+        return updated;
+      });
+    } else {
+      setKupiti(prev => {
+        const updated = { ...prev };
+        delete updated[itemId];
+        return updated;
+      });
+    }
+
     try {
       const itemRef = ref(database, `shoppingList/${listName}/${itemId}`);
       await remove(itemRef);
+
+      // Add to undo stack
+      showUndoNotification({
+        type: "delete",
+        itemId,
+        item: itemToDelete,
+        listName,
+        itemName
+      });
     } catch (error) {
       console.error("Error deleting item:", error);
-      alert("Failed to delete item. Please try again.");
+      setError("Failed to delete item. Please try again.");
     }
   };
 
   // Add new item to kupiti list
   const addItem = async () => {
-    if (newItem.trim() === "") return;
+    const trimmedItem = newItem.trim();
+    
+    if (trimmedItem === "") return;
+
+    if (itemExists(trimmedItem)) {
+      setError(`"${trimmedItem}" already exists in your lists!`);
+      setTimeout(() => setError(null), 3000);
+      return;
+    }
+
+    const uniqueId = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
     try {
-      // Generate unique ID using timestamp + random
-      const uniqueId = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      
       const item = {
-        name: newItem.trim(),
+        name: trimmedItem,
         addedBy: username,
         addedAt: Date.now()
       };
+
+      // Optimistic update
+      setKupiti(prev => ({
+        ...prev,
+        [uniqueId]: item
+      }));
 
       const itemRef = ref(database, `shoppingList/kupiti/${uniqueId}`);
       await set(itemRef, item);
       
       setNewItem("");
+      setError(null);
+
+      // Add animation for new item
+      setAnimatingItems(prev => new Set(prev).add(uniqueId));
+      setTimeout(() => {
+        setAnimatingItems(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(uniqueId);
+          return newSet;
+        });
+      }, 300);
     } catch (error) {
       console.error("Error adding item:", error);
-      alert("Failed to add item. Please try again.");
+      setError("Failed to add item. Please try again.");
+      
+      setKupiti(prev => {
+        const reverted = { ...prev };
+        delete reverted[uniqueId];
+        return reverted;
+      });
     }
   };
 
@@ -120,28 +362,71 @@ export default function App() {
   if (loading) {
     return (
       <div style={styles.loadingContainer}>
+        <div style={styles.spinner}></div>
         <p>Loading...</p>
       </div>
     );
   }
 
-  // Convert objects to arrays for rendering
   const imamoArray = Object.entries(imamo).map(([id, item]) => ({ id, ...item }));
   const kupitiArray = Object.entries(kupiti).map(([id, item]) => ({ id, ...item }));
 
+  const otherOnlineUsers = Object.entries(onlineUsers)
+    .filter(([name, data]) => name !== username && data.online)
+    .map(([name]) => name);
+
   return (
     <div style={styles.page}>
-      <div style={styles.logoutContainer}>
-        <span style={styles.welcomeText}>
-          Welcome, <span style={{ color: userColors[username] || "#6b7280" }}>{username}</span>
-        </span>
-        <button style={styles.logoutButton} onClick={handleLogout}>
-          Logout
-        </button>
+      <div style={styles.topBar}>
+        <div style={styles.logoutContainer}>
+          <span style={styles.welcomeText}>
+            Welcome, <span style={{ color: userColors[username] || "#6b7280" }}>{username}</span>
+          </span>
+          <button 
+            style={styles.logoutButton} 
+            onClick={handleLogout}
+            onMouseEnter={(e) => e.target.style.backgroundColor = "#dc2626"}
+            onMouseLeave={(e) => e.target.style.backgroundColor = "#ef4444"}
+          >
+            Logout
+          </button>
+        </div>
+        
+        {otherOnlineUsers.length > 0 && (
+          <div style={styles.onlineIndicator}>
+            <span style={styles.onlineDot}>●</span>
+            <span style={styles.onlineText}>
+              {otherOnlineUsers.map(name => (
+                <span key={name} style={{ color: userColors[name] || "#6b7280" }}>
+                  {name}
+                </span>
+              ))} online
+            </span>
+          </div>
+        )}
       </div>
 
+      {error && (
+        <div style={styles.errorBanner}>
+          <span>⚠️ {error}</span>
+          <button style={styles.closeError} onClick={() => setError(null)}>✖</button>
+        </div>
+      )}
+
+      {showUndo && undoStack.length > 0 && (
+        <div style={styles.undoBanner}>
+          <span>
+            {undoStack[0].type === "move" 
+              ? `Moved "${undoStack[0].itemName}"` 
+              : `Deleted "${undoStack[0].itemName}"`}
+          </span>
+          <button style={styles.undoButton} onClick={performUndo}>
+            ↶ Undo
+          </button>
+        </div>
+      )}
+
       <div style={styles.container}>
-        {/* Left Table - Imamo */}
         <div>
           <h2 style={styles.header}>Imamo ({imamoArray.length})</h2>
           <ul style={styles.table}>
@@ -151,8 +436,13 @@ export default function App() {
               imamoArray.map((item) => (
                 <li
                   key={item.id}
-                  style={styles.item}
+                  style={{
+                    ...styles.item,
+                    ...(animatingItems.has(item.id) ? styles.itemAnimating : {})
+                  }}
                   onClick={() => moveItem(item.id, { name: item.name, addedBy: item.addedBy, addedAt: item.addedAt }, "imamo", "kupiti")}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#f3f4f6"}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
                 >
                   <div style={styles.itemText}>
                     <strong>{item.name}</strong>
@@ -168,10 +458,10 @@ export default function App() {
                     style={styles.deleteButton}
                     onClick={(e) => {
                       e.stopPropagation();
-                      if (window.confirm(`Delete "${item.name}"?`)) {
-                        deleteItem(item.id, "imamo");
-                      }
+                      deleteItem(item.id, "imamo", item.name);
                     }}
+                    onMouseEnter={(e) => e.target.style.color = "#dc2626"}
+                    onMouseLeave={(e) => e.target.style.color = "#ef4444"}
                   >
                     ✖
                   </button>
@@ -181,7 +471,6 @@ export default function App() {
           </ul>
         </div>
 
-        {/* Right Table - Kupiti */}
         <div>
           <h2 style={styles.header}>Kupiti ({kupitiArray.length})</h2>
           <ul style={styles.table}>
@@ -191,8 +480,13 @@ export default function App() {
               kupitiArray.map((item) => (
                 <li
                   key={item.id}
-                  style={styles.item}
+                  style={{
+                    ...styles.item,
+                    ...(animatingItems.has(item.id) ? styles.itemAnimating : {})
+                  }}
                   onClick={() => moveItem(item.id, { name: item.name, addedBy: item.addedBy, addedAt: item.addedAt }, "kupiti", "imamo")}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#f3f4f6"}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
                 >
                   <div style={styles.itemText}>
                     <strong>{item.name}</strong>
@@ -208,10 +502,10 @@ export default function App() {
                     style={styles.deleteButton}
                     onClick={(e) => {
                       e.stopPropagation();
-                      if (window.confirm(`Delete "${item.name}"?`)) {
-                        deleteItem(item.id, "kupiti");
-                      }
+                      deleteItem(item.id, "kupiti", item.name);
                     }}
+                    onMouseEnter={(e) => e.target.style.color = "#dc2626"}
+                    onMouseLeave={(e) => e.target.style.color = "#ef4444"}
                   >
                     ✖
                   </button>
@@ -220,7 +514,6 @@ export default function App() {
             )}
           </ul>
 
-          {/* Input Field and Button */}
           <div style={styles.inputArea}>
             <input
               type="text"
@@ -231,9 +524,23 @@ export default function App() {
               style={styles.input}
             />
             <button 
-              style={styles.addButton} 
+              style={{
+                ...styles.addButton,
+                opacity: !newItem.trim() ? 0.5 : 1,
+                cursor: !newItem.trim() ? "not-allowed" : "pointer"
+              }}
               onClick={addItem}
               disabled={!newItem.trim()}
+              onMouseEnter={(e) => {
+                if (newItem.trim()) {
+                  e.target.style.backgroundColor = "#2563eb";
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (newItem.trim()) {
+                  e.target.style.backgroundColor = "#3b82f6";
+                }
+              }}
             >
               Add to Kupiti
             </button>
@@ -256,19 +563,31 @@ const styles = {
   },
   loadingContainer: {
     display: "flex",
+    flexDirection: "column",
     justifyContent: "center",
     alignItems: "center",
     minHeight: "100vh",
     fontSize: "1.2rem",
     color: "#6b7280",
   },
+  spinner: {
+    width: "40px",
+    height: "40px",
+    border: "4px solid #e5e7eb",
+    borderTop: "4px solid #3b82f6",
+    borderRadius: "50%",
+    animation: "spin 1s linear infinite",
+    marginBottom: "1rem",
+  },
+  topBar: {
+    width: "100%",
+    maxWidth: "600px",
+    marginBottom: "1rem",
+  },
   logoutContainer: {
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
-    width: "100%",
-    maxWidth: "600px",
-    marginBottom: "1rem",
     padding: "0.5rem",
   },
   welcomeText: {
@@ -285,7 +604,77 @@ const styles = {
     cursor: "pointer",
     fontSize: "0.9rem",
     fontWeight: "500",
+    transition: "background-color 0.3s",
+  },
+  onlineIndicator: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "0.5rem",
+    backgroundColor: "#f0fdf4",
+    borderRadius: "0.5rem",
+    marginTop: "0.5rem",
+    border: "1px solid #bbf7d0",
+  },
+  onlineDot: {
+    color: "#22c55e",
+    marginRight: "0.5rem",
+    fontSize: "1.2rem",
+    animation: "pulse 2s ease-in-out infinite",
+  },
+  onlineText: {
+    fontSize: "0.9rem",
+    color: "#166534",
+    fontWeight: "500",
+  },
+  errorBanner: {
+    width: "100%",
+    maxWidth: "600px",
+    padding: "0.75rem 1rem",
+    backgroundColor: "#fef2f2",
+    border: "1px solid #fecaca",
+    borderRadius: "0.5rem",
+    marginBottom: "1rem",
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    color: "#991b1b",
+    fontSize: "0.9rem",
+    animation: "slideIn 0.3s ease-out",
+  },
+  undoBanner: {
+    width: "100%",
+    maxWidth: "600px",
+    padding: "0.75rem 1rem",
+    backgroundColor: "#f0f9ff",
+    border: "1px solid #bae6fd",
+    borderRadius: "0.5rem",
+    marginBottom: "1rem",
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    color: "#075985",
+    fontSize: "0.9rem",
+    animation: "slideIn 0.3s ease-out",
+  },
+  undoButton: {
+    padding: "0.25rem 0.75rem",
+    backgroundColor: "#0284c7",
+    color: "white",
+    border: "none",
+    borderRadius: "0.375rem",
+    cursor: "pointer",
+    fontSize: "0.9rem",
+    fontWeight: "500",
     transition: "background-color 0.2s",
+  },
+  closeError: {
+    background: "none",
+    border: "none",
+    color: "#991b1b",
+    cursor: "pointer",
+    fontSize: "1rem",
+    padding: "0",
   },
   container: {
     display: "grid",
@@ -330,7 +719,11 @@ const styles = {
     alignItems: "center",
     borderRadius: "0.5rem",
     cursor: "pointer",
-    transition: "background-color 0.2s",
+    transition: "all 0.3s ease",
+  },
+  itemAnimating: {
+    transform: "scale(0.95)",
+    opacity: 0.7,
   },
   itemText: {
     color: "#374151",
@@ -344,6 +737,7 @@ const styles = {
     fontSize: "1.2rem",
     cursor: "pointer",
     padding: "0.25rem 0.5rem",
+    transition: "color 0.2s",
   },
   inputArea: {
     marginTop: "1rem",
@@ -356,6 +750,7 @@ const styles = {
     width: "92%",
     marginBottom: "0.5rem",
     fontSize: "1rem",
+    transition: "border-color 0.2s",
   },
   addButton: {
     padding: "0.75rem",
@@ -366,6 +761,6 @@ const styles = {
     fontWeight: "500",
     border: "none",
     cursor: "pointer",
-    transition: "opacity 0.2s",
+    transition: "all 0.3s",
   },
 };
