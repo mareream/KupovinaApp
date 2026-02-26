@@ -1,13 +1,13 @@
 {
   "files": {
-    "main.css": "/KupovinaApp/static/css/main.6fe07b77.css",
-    "main.js": "/KupovinaApp/static/js/main.bac49189.js",
+    "main.css": "/KupovinaApp/static/css/main.74a0076b.css",
+    "main.js": "/KupovinaApp/static/js/main.1955b377.js",
     "index.html": "/KupovinaApp/index.html",
-    "main.6fe07b77.css.map": "/KupovinaApp/static/css/main.6fe07b77.css.map",
-    "main.bac49189.js.map": "/KupovinaApp/static/js/main.bac49189.js.map"
+    "main.74a0076b.css.map": "/KupovinaApp/static/css/main.74a0076b.css.map",
+    "main.1955b377.js.map": "/KupovinaApp/static/js/main.1955b377.js.map"
   },
   "entrypoints": [
-    "static/css/main.6fe07b77.css",
-    "static/js/main.bac49189.js"
+    "static/css/main.74a0076b.css",
+    "static/js/main.1955b377.js"
   ]
 }
