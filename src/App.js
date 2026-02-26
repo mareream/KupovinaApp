@@ -23,6 +23,7 @@ export default function App() {
   const [undoStack, setUndoStack] = useState([]);
   const [showUndo, setShowUndo] = useState(false);
   const [animatingItems, setAnimatingItems] = useState(new Set());
+  const [currentPage, setCurrentPage] = useState("shopping"); // "shopping" or "kuhinjica"
   
   // Tag selection modal state
   const [showTagModal, setShowTagModal] = useState(false);
@@ -222,7 +223,7 @@ export default function App() {
         newSet.delete(itemId);
         return newSet;
       });
-    }, 300);
+    }, 400);
 
     const updatedFrom = { ...eval(fromList) };
     const updatedTo = { ...eval(toList) };
@@ -288,7 +289,7 @@ export default function App() {
         newSet.delete(itemId);
         return newSet;
       });
-    }, 300);
+    }, 400);
 
     if (listName === "imamo") {
       setImamo(prev => {
@@ -395,6 +396,7 @@ export default function App() {
       await set(itemRef, item);
       
       setNewItem("");
+      document.activeElement.blur();
       setShowTagModal(false);
       setPendingItemName("");
       setSelectedTag("");
@@ -407,7 +409,7 @@ export default function App() {
           newSet.delete(uniqueId);
           return newSet;
         });
-      }, 300);
+      }, 400);
     } catch (error) {
       console.error("Error adding item:", error);
       setError("Failed to add item. Please try again.");
@@ -484,32 +486,26 @@ export default function App() {
       </div>
 
       <div style={styles.topBar}>
-        <div style={styles.logoutContainer}>
-          <span style={styles.welcomeText}>
-            Welcome, <span style={{ color: userColors[username] || "#6b7280" }}>{username}</span>
-          </span>
-          <button 
-            style={styles.logoutButton} 
-            onClick={handleLogout}
-            onMouseEnter={(e) => e.target.style.backgroundColor = "#dc2626"}
-            onMouseLeave={(e) => e.target.style.backgroundColor = "#ef4444"}
-          >
-            Logout
-          </button>
-        </div>
-        
-        {otherOnlineUsers.length > 0 && (
-          <div style={styles.onlineIndicator}>
-            <span style={styles.onlineDot}>●</span>
-            <span style={styles.onlineText}>
-              {otherOnlineUsers.map(name => (
-                <span key={name} style={{ color: userColors[name] || "#6b7280" }}>
-                  {name}
-                </span>
-              ))} online
+        <div style={styles.navContainer}>
+          {/* Username and Online Status */}
+          <div style={styles.userInfo}>
+            <span style={{ ...styles.username, color: userColors[username] || "#6b7280" }}>
+              {username}
             </span>
+            {otherOnlineUsers.length > 0 && (
+              <span style={styles.onlineBadge}>
+                <span style={styles.onlineDot}>●</span>
+                {otherOnlineUsers.join(", ")}
+              </span>
+            )}
           </div>
-        )}
+
+          {/* Navigation Buttons */}
+          
+
+          {/* Logout Button */}
+          
+        </div>
       </div>
 
       {/* Tag Selection Modal */}
@@ -594,162 +590,190 @@ export default function App() {
         </div>
       )}
 
-      <div style={styles.container}>
-        {/* Left Table - Imamo */}
-        <div>
-          <h2 style={styles.header}>Imamo ({imamoCount})</h2>
-          <div style={styles.table}>
-            {Object.keys(imamoGrouped).length === 0 ? (
-              <div style={styles.emptyState}>No items yet</div>
-            ) : (
-              Object.entries(imamoGrouped).map(([tag, items]) => (
-                <div key={tag} style={styles.tagGroup}>
-                  <div style={styles.tagHeader}>
-                    <span style={{
-                      ...styles.tagLabel,
-                      borderColor: availableTags[tag] || "#6b7280",
-                      color: availableTags[tag] || "#6b7280"
-                    }}>
-                      {tag}
-                    </span>
-                    <span style={styles.tagCount}>({items.length})</span>
-                  </div>
-                  <ul style={styles.itemList}>
-                    {items.map((item) => (
-                      <li
-                        key={item.id}
-                        style={{
-                          ...styles.item,
-                          ...(animatingItems.has(item.id) ? styles.itemAnimating : {})
-                        }}
-                        onClick={() => moveItem(item.id, { name: item.name, addedBy: item.addedBy, addedAt: item.addedAt, tag: item.tag }, "imamo", "kupiti")}
-                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#f3f4f6"}
-                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
-                      >
-                        <div style={styles.itemText}>
-                          <strong>{item.name}</strong>
-                          <br />
-                          <small>
+      {/* Main Content - Shopping Lists */}
+      {currentPage === "shopping" && (
+        <div className="content">
+          {/* Left Table - Kupiti */}
+          <div>
+            {/* Input Field and Button */}
+            
+            
+            <h2 style={styles.header}>Kupiti ({kupitiCount})</h2>
+            <div style={styles.table}>
+              {Object.keys(kupitiGrouped).length === 0 ? (
+                <div style={styles.emptyState}>No items to buy</div>
+              ) : (
+                Object.entries(kupitiGrouped).map(([tag, items]) => (
+                  <div key={tag} style={styles.tagGroup}>
+                    <div style={styles.tagHeader}>
+                      <span className={`tag-chip ${tag.toLowerCase()}`}>
+                        {tag}
+                      </span>
+                      <span style={styles.tagCount}>({items.length})</span>
+                    </div>
+                    <ul style={styles.itemList}>
+                      {items.map((item) => (
+                        <li
+                          key={item.id}
+                          className={`shopping-card ${
+                            animatingItems.has(item.id) ? "animate-in" : ""
+                          }`}
+                          onClick={() =>
+                            moveItem(
+                              item.id,
+                              {
+                                name: item.name,
+                                addedBy: item.addedBy,
+                                addedAt: item.addedAt,
+                                tag: item.tag,
+                              },
+                              "kupiti",
+                              "imamo"
+                            )
+                          }
+                        >
+                         <div className="item-name">{item.name}</div>
+                         <div className="item-meta">
                             added by{" "}
                             <span style={{ color: userColors[item.addedBy] || "#6b7280" }}>
                               {item.addedBy}
                             </span>
-                          </small>
-                        </div>
-                        <button
-                          style={styles.deleteButton}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            deleteItem(item.id, "imamo", item.name);
-                          }}
-                          onMouseEnter={(e) => e.target.style.color = "#dc2626"}
-                          onMouseLeave={(e) => e.target.style.color = "#ef4444"}
-                        >
-                          ✖
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-
-        {/* Right Table - Kupiti */}
-        <div>
-          <h2 style={styles.header}>Kupiti ({kupitiCount})</h2>
-          <div style={styles.table}>
-            {Object.keys(kupitiGrouped).length === 0 ? (
-              <div style={styles.emptyState}>No items to buy</div>
-            ) : (
-              Object.entries(kupitiGrouped).map(([tag, items]) => (
-                <div key={tag} style={styles.tagGroup}>
-                  <div style={styles.tagHeader}>
-                    <span style={{
-                      ...styles.tagLabel,
-                      borderColor: availableTags[tag] || "#6b7280",
-                      color: availableTags[tag] || "#6b7280"
-                    }}>
-                      {tag}
-                    </span>
-                    <span style={styles.tagCount}>({items.length})</span>
+                         </div>
+                          <button
+                            style={styles.deleteButton}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              deleteItem(item.id, "kupiti", item.name);
+                            }}
+                            onMouseEnter={(e) => e.target.style.color = "#dc2626"}
+                            onMouseLeave={(e) => e.target.style.color = "#ef4444"}
+                          >
+                            ✖
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
                   </div>
-                  <ul style={styles.itemList}>
-                    {items.map((item) => (
-                      <li
-                        key={item.id}
-                        style={{
-                          ...styles.item,
-                          ...(animatingItems.has(item.id) ? styles.itemAnimating : {})
-                        }}
-                        onClick={() => moveItem(item.id, { name: item.name, addedBy: item.addedBy, addedAt: item.addedAt, tag: item.tag }, "kupiti", "imamo")}
-                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#f3f4f6"}
-                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
-                      >
-                        <div style={styles.itemText}>
-                          <strong>{item.name}</strong>
-                          <br />
-                          <small>
-                            added by{" "}
-                            <span style={{ color: userColors[item.addedBy] || "#6b7280" }}>
-                              {item.addedBy}
-                            </span>
-                          </small>
-                        </div>
-                        <button
-                          style={styles.deleteButton}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            deleteItem(item.id, "kupiti", item.name);
-                          }}
-                          onMouseEnter={(e) => e.target.style.color = "#dc2626"}
-                          onMouseLeave={(e) => e.target.style.color = "#ef4444"}
-                        >
-                          ✖
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))
-            )}
+                ))
+              )}
+            </div>
           </div>
 
-          {/* Input Field and Button */}
-          <div style={styles.inputArea}>
-            <input
-              type="text"
-              value={newItem}
-              onChange={(e) => setNewItem(e.target.value)}
-              onKeyPress={(e) => e.key === "Enter" && initiateAddItem()}
-              placeholder="Enter item name!"
-              style={styles.input}
-            />
-            <button 
-              style={{
-                ...styles.addButton,
-                opacity: !newItem.trim() ? 0.5 : 1,
-                cursor: !newItem.trim() ? "not-allowed" : "pointer"
-              }}
-              onClick={initiateAddItem}
-              disabled={!newItem.trim()}
-              onMouseEnter={(e) => {
-                if (newItem.trim()) {
-                  e.target.style.backgroundColor = "#2563eb";
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (newItem.trim()) {
-                  e.target.style.backgroundColor = "#3b82f6";
-                }
-              }}
-            >
-              Add to Kupiti
-            </button>
+          {/* Right Table - Imamo */}
+          <div>
+            <h2 style={styles.header}>Imamo ({imamoCount})</h2>
+            <div style={styles.table}>
+              {Object.keys(imamoGrouped).length === 0 ? (
+                <div style={styles.emptyState}>No items yet</div>
+              ) : (
+                Object.entries(imamoGrouped).map(([tag, items]) => (
+                  <div key={tag} style={styles.tagGroup}>
+                    <div style={styles.tagHeader}>
+                      <span className={`tag-chip ${tag.toLowerCase()}`}>
+                        {tag}
+                      </span>
+                      <span style={styles.tagCount}>({items.length})</span>
+                    </div>
+                    <ul style={styles.itemList}>
+                      {items.map((item) => (
+                        <li
+                          key={item.id}
+                          className={`shopping-card ${
+                            animatingItems.has(item.id) ? "animate-in" : ""
+                          }`}
+                          onClick={() => moveItem(item.id, { name: item.name, addedBy: item.addedBy, addedAt: item.addedAt, tag: item.tag }, "imamo", "kupiti")}
+                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#f3f4f6"}
+                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
+                        >
+                          <div style={styles.itemText}>
+                            <strong>{item.name}</strong>
+                            <br />
+                            <small>
+                              added by{" "}
+                              <span style={{ color: userColors[item.addedBy] || "#6b7280" }}>
+                                {item.addedBy}
+                              </span>
+                            </small>
+                          </div>
+                          <button
+                            style={styles.deleteButton}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              deleteItem(item.id, "imamo", item.name);
+                            }}
+                            onMouseEnter={(e) => e.target.style.color = "#dc2626"}
+                            onMouseLeave={(e) => e.target.style.color = "#ef4444"}
+                          >
+                            ✖
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
         </div>
+      )}
+
+      {/* Kuhinjica Page */}
+      {currentPage === "kuhinjica" && (
+        <div className="content">
+          <div style={styles.kuhinjicaPage}>
+            <h2 style={styles.kuhinjicaTitle}>🍳 Kuhinjica</h2>
+            <p style={styles.kuhinjicaText}>Coming soon...</p>
+          </div>
+        </div>
+      )}
+      <div className="bottom-nav">
+        <button
+          className={`nav-btn ${currentPage === "shopping" ? "active" : ""}`}
+          onClick={() => setCurrentPage("shopping")}
+        >
+          🛒
+          <small>Lista</small>
+        </button>
+
+        <button
+          className={`nav-btn ${currentPage === "kuhinjica" ? "active" : ""}`}
+          onClick={() => setCurrentPage("kuhinjica")}
+        >
+          🍳
+          <small>Kuhinja</small>
+        </button>
+
+        <button
+          className="nav-btn"
+          onClick={handleLogout}
+        >
+          ⏻
+          <small>Logout</small>
+        </button>
       </div>
+
+      <div className="add-bar">
+        <input
+          type="text"
+          value={newItem}
+          placeholder="Add milk..."
+          onChange={(e) => setNewItem(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              initiateAddItem();
+            }
+          }}
+        />
+
+        <button
+          className="add-btn"
+          onClick={initiateAddItem}
+          disabled={!newItem.trim()}
+        >
+          +
+        </button>
+      </div>
+
     </div>
   );
 }
@@ -758,12 +782,12 @@ const styles = {
   page: {
     display: "flex",
     flexDirection: "column",
-    justifyContent: "center",
     alignItems: "center",
     minHeight: "100vh",
     background: "linear-gradient(to bottom right, #e5e7eb, #f9fafb)",
-    padding: "2rem",
+    padding: "0",
     paddingTop: "5rem",
+    paddingBottom: "2rem",
   },
   fixedBannerContainer: {
     position: "fixed",
@@ -798,52 +822,102 @@ const styles = {
     marginBottom: "1rem",
   },
   topBar: {
+    position: "fixed",
+    top: "0",
+    left: "0",
+    right: "0",
     width: "100%",
-    maxWidth: "600px",
-    marginBottom: "1rem",
+    backgroundColor: "white",
+    borderBottom: "2px solid #e5e7eb",
+    boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
+    zIndex: 999,
   },
-  logoutContainer: {
+  navContainer: {
     display: "flex",
-    justifyContent: "space-between",
+    flexDirection: "column",
+    gap: "0.75rem",
+    padding: "0.75rem 1rem",
+    maxWidth: "1200px",
+    margin: "0 auto",
+  },
+  userInfo: {
+    display: "flex",
     alignItems: "center",
-    padding: "0.5rem",
+    justifyContent: "space-between",
+    gap: "0.5rem",
+    flexWrap: "wrap",
   },
-  welcomeText: {
-    fontSize: "1rem",
-    fontWeight: "500",
-    color: "#374151",
+  username: {
+    fontSize: "0.95rem",
+    fontWeight: "700",
   },
-  logoutButton: {
-    padding: "0.5rem 1rem",
+  onlineBadge: {
+    display: "flex",
+    alignItems: "center",
+    gap: "0.25rem",
+    fontSize: "0.75rem",
+    color: "#6b7280",
+    backgroundColor: "#f0fdf4",
+    padding: "0.25rem 0.5rem",
+    borderRadius: "0.375rem",
+    border: "1px solid #bbf7d0",
+  },
+  onlineDot: {
+    color: "#22c55e",
+    fontSize: "0.6rem",
+  },
+  navTabs: {
+    display: "flex",
+    gap: "0.5rem",
+    backgroundColor: "#f3f4f6",
+    padding: "0.25rem",
+    borderRadius: "0.5rem",
+  },
+  navTab: {
+    flex: 1,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "0.5rem",
+    padding: "0.6rem 1rem",
+    border: "none",
+    borderRadius: "0.375rem",
+    cursor: "pointer",
+    fontSize: "0.9rem",
+    fontWeight: "600",
+    transition: "all 0.2s",
+    backgroundColor: "transparent",
+    color: "#6b7280",
+  },
+  navTabActive: {
+    backgroundColor: "white",
+    color: "#3b82f6",
+    boxShadow: "0 1px 3px rgba(0, 0, 0, 0.1)",
+  },
+  tabIcon: {
+    fontSize: "1.2rem",
+  },
+  tabText: {
+    fontSize: "0.9rem",
+  },
+  logoutBtn: {
+    position: "absolute",
+    top: "0.75rem",
+    right: "1rem",
+    width: "2.5rem",
+    height: "2.5rem",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
     backgroundColor: "#ef4444",
     color: "white",
     border: "none",
     borderRadius: "0.5rem",
     cursor: "pointer",
-    fontSize: "0.9rem",
-    fontWeight: "500",
-    transition: "background-color 0.3s",
-  },
-  onlineIndicator: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: "0.5rem",
-    backgroundColor: "#f0fdf4",
-    borderRadius: "0.5rem",
-    marginTop: "0.5rem",
-    border: "1px solid #bbf7d0",
-  },
-  onlineDot: {
-    color: "#22c55e",
-    marginRight: "0.5rem",
     fontSize: "1.2rem",
-    animation: "pulse 2s ease-in-out infinite",
-  },
-  onlineText: {
-    fontSize: "0.9rem",
-    color: "#166534",
-    fontWeight: "500",
+    fontWeight: "600",
+    transition: "background-color 0.2s",
+    boxShadow: "0 1px 3px rgba(0, 0, 0, 0.1)",
   },
   errorBanner: {
     width: "100%",
@@ -1034,6 +1108,7 @@ const styles = {
     border: "1px solid #d1d5db",
     width: "100%",
     maxWidth: "600px",
+    margin: "0 1rem",
   },
   header: {
     fontSize: "1.5rem",
@@ -1083,27 +1158,6 @@ const styles = {
     color: "#9ca3af",
     fontStyle: "italic",
   },
-  item: {
-    padding: "0.75rem",
-    marginBottom: "0.5rem",
-    borderBottom: "1px solid #e5e7eb",
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    borderRadius: "0.5rem",
-    cursor: "pointer",
-    transition: "all 0.3s ease",
-    backgroundColor: "white",
-  },
-  itemAnimating: {
-    transform: "scale(0.95)",
-    opacity: 0.7,
-  },
-  itemText: {
-    color: "#374151",
-    fontWeight: "500",
-    flexGrow: 1,
-  },
   deleteButton: {
     color: "#ef4444",
     background: "none",
@@ -1113,28 +1167,23 @@ const styles = {
     padding: "0.25rem 0.5rem",
     transition: "color 0.2s",
   },
-  inputArea: {
-    marginTop: "1rem",
-    width: "100%",
+  kuhinjicaPage: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "4rem 2rem",
+    textAlign: "center",
   },
-  input: {
-    padding: "0.75rem",
-    border: "1px solid #d1d5db",
-    borderRadius: "0.5rem",
-    width: "92%",
-    marginBottom: "0.5rem",
-    fontSize: "1rem",
-    transition: "border-color 0.2s",
+  kuhinjicaTitle: {
+    fontSize: "2.5rem",
+    fontWeight: "bold",
+    color: "#374151",
+    marginBottom: "1rem",
   },
-  addButton: {
-    padding: "0.75rem",
-    backgroundColor: "#3b82f6",
-    color: "white",
-    borderRadius: "0.5rem",
-    width: "100%",
-    fontWeight: "500",
-    border: "none",
-    cursor: "pointer",
-    transition: "all 0.3s",
+  kuhinjicaText: {
+    fontSize: "1.2rem",
+    color: "#6b7280",
+    fontStyle: "italic",
   },
 };

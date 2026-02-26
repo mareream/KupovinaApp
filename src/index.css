@@ -1,3 +1,5 @@
+@import "./Mobile_Vibrant_Design_System_v1.css";
+
 /* Basic Styles */
 body {
   font-family: Arial, sans-serif;
@@ -48,5 +50,22 @@ body {
 @media (min-width: 768px) {
   .container {
     grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* Mobile optimizations */
+@media (max-width: 640px) {
+  /* Slightly smaller text on mobile */
+  .tabText {
+    font-size: 0.85rem !important;
+  }
+  
+  .tabIcon {
+    font-size: 1.1rem !important;
+  }
+  
+  /* Adjust padding on very small screens */
+  .navTab {
+    padding: 0.5rem 0.75rem !important;
   }
 }
