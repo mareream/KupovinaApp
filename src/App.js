@@ -2,18 +2,23 @@ import { useState, useEffect, useRef } from "react";
 import { database, ref, set, onValue, remove, auth, signOut, onAuthStateChanged } from "./firebase";
 import { useLocation, useNavigate } from "react-router-dom";
 
-// Default tags with colors
+// Default tags with vibrant colors
 const DEFAULT_TAGS = {
-  "DM": "#9333ea",
-  "Maxi": "#dc2626",
-  "VocPovrc": "#16a34a",
-  "Apoteka": "#2563eb",
-  "Lidl": "#ea580c"
+  "DM": "#FF6B6B",      // Coral
+  "Maxi": "#4ECDC4",    // Turquoise
+  "VocPovrc": "#A8E6CF", // Mint
+  "Apoteka": "#FFD93D",  // Sunny Yellow
+  "Lidl": "#6C5CE7"      // Purple
+};
+
+// User colors - more vibrant
+const USER_COLORS = {
+  Mare: "#FF8A5C",      // Peach
+  Caka: "#FF6B9D",      // Pink
 };
 
 export default function App() {
-  const [imamo, setImamo] = useState({});
-  const [kupiti, setKupiti] = useState({});
+  const [lists, setLists] = useState({ imamo: {}, kupiti: {} });
   const [availableTags, setAvailableTags] = useState(DEFAULT_TAGS);
   const [newItem, setNewItem] = useState("");
   const [currentUser, setCurrentUser] = useState(null);
@@ -23,14 +28,15 @@ export default function App() {
   const [undoStack, setUndoStack] = useState([]);
   const [showUndo, setShowUndo] = useState(false);
   const [animatingItems, setAnimatingItems] = useState(new Set());
-  const [currentPage, setCurrentPage] = useState("shopping"); // "shopping" or "kuhinjica"
+  const [currentPage, setCurrentPage] = useState("shopping");
+  const [recipes, setRecipes] = useState({});
   
   // Tag selection modal state
   const [showTagModal, setShowTagModal] = useState(false);
   const [pendingItemName, setPendingItemName] = useState("");
   const [selectedTag, setSelectedTag] = useState("");
   const [newTagName, setNewTagName] = useState("");
-  const [newTagColor, setNewTagColor] = useState("#6366f1");
+  const [newTagColor, setNewTagColor] = useState("#FFB347"); // Warm orange default
   const [showAddTag, setShowAddTag] = useState(false);
   
   const location = useLocation();
@@ -52,7 +58,7 @@ export default function App() {
     return () => unsubscribe();
   }, [navigate]);
 
-  // Listen to Firebase changes
+  // Consolidated shopping list listener
   useEffect(() => {
     if (!currentUser) return;
 
@@ -60,16 +66,30 @@ export default function App() {
     const unsubscribe = onValue(dataRef, (snapshot) => {
       const data = snapshot.val();
       if (data) {
-        setImamo(data.imamo || {});
-        setKupiti(data.kupiti || {});
+        setLists({
+          imamo: data.imamo || {},
+          kupiti: data.kupiti || {}
+        });
       } else {
-        setImamo({});
-        setKupiti({});
+        setLists({ imamo: {}, kupiti: {} });
       }
       setError(null);
     }, (error) => {
       console.error("Error reading from Firebase:", error);
       setError("Failed to load data. Please refresh the page.");
+    });
+
+    return () => unsubscribe();
+  }, [currentUser]);
+
+  // Listen to recipes
+  useEffect(() => {
+    if (!currentUser) return;
+
+    const recipesRef = ref(database, "recipes");
+    const unsubscribe = onValue(recipesRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data) setRecipes(data);
     });
 
     return () => unsubscribe();
@@ -161,10 +181,10 @@ export default function App() {
   const itemExists = (itemName) => {
     const normalizedName = itemName.trim().toLowerCase();
     
-    const existsInImamo = Object.values(imamo).some(
+    const existsInImamo = Object.values(lists.imamo).some(
       item => item.name.toLowerCase() === normalizedName
     );
-    const existsInKupiti = Object.values(kupiti).some(
+    const existsInKupiti = Object.values(lists.kupiti).some(
       item => item.name.toLowerCase() === normalizedName
     );
     
@@ -192,11 +212,11 @@ export default function App() {
     
     try {
       if (action.type === "move") {
-        const toRef = ref(database, `shoppingList/${action.fromList}/${action.itemId}`);
-        await set(toRef, action.item);
+        const fromRef = ref(database, `shoppingList/${action.fromList}/${action.itemId}`);
+        await set(fromRef, action.item);
         
-        const fromRef = ref(database, `shoppingList/${action.toList}/${action.itemId}`);
-        await remove(fromRef);
+        const toRef = ref(database, `shoppingList/${action.toList}/${action.itemId}`);
+        await remove(toRef);
       } else if (action.type === "delete") {
         const itemRef = ref(database, `shoppingList/${action.listName}/${action.itemId}`);
         await set(itemRef, action.item);
@@ -215,7 +235,11 @@ export default function App() {
   };
 
   const moveItem = async (itemId, item, fromList, toList) => {
-    setAnimatingItems(prev => new Set(prev).add(itemId));
+    setAnimatingItems(prev => {
+      const newSet = new Set(prev);
+      newSet.add(itemId);
+      return newSet;
+    });
     
     setTimeout(() => {
       setAnimatingItems(prev => {
@@ -225,19 +249,15 @@ export default function App() {
       });
     }, 400);
 
-    const updatedFrom = { ...eval(fromList) };
-    const updatedTo = { ...eval(toList) };
+    const updatedLists = {
+      imamo: { ...lists.imamo },
+      kupiti: { ...lists.kupiti }
+    };
     
-    delete updatedFrom[itemId];
-    updatedTo[itemId] = item;
+    delete updatedLists[fromList][itemId];
+    updatedLists[toList][itemId] = item;
     
-    if (fromList === "imamo") {
-      setImamo(updatedFrom);
-      setKupiti(updatedTo);
-    } else {
-      setKupiti(updatedFrom);
-      setImamo(updatedTo);
-    }
+    setLists(updatedLists);
 
     try {
       const toRef = ref(database, `shoppingList/${toList}/${itemId}`);
@@ -256,32 +276,24 @@ export default function App() {
       });
     } catch (error) {
       console.error("Error moving item:", error);
-      setError("Failed to move item. Changes reverted.");
-      
-      if (fromList === "imamo") {
-        setImamo(prev => ({ ...prev, [itemId]: item }));
-        setKupiti(prev => {
-          const reverted = { ...prev };
-          delete reverted[itemId];
-          return reverted;
-        });
-      } else {
-        setKupiti(prev => ({ ...prev, [itemId]: item }));
-        setImamo(prev => {
-          const reverted = { ...prev };
-          delete reverted[itemId];
-          return reverted;
-        });
-      }
+      setError("Failed to move item. Please try again.");
+      setLists({
+        imamo: lists.imamo,
+        kupiti: lists.kupiti
+      });
     }
   };
 
   const deleteItem = async (itemId, listName, itemName) => {
     if (!window.confirm(`Delete "${itemName}"?`)) return;
 
-    const itemToDelete = listName === "imamo" ? imamo[itemId] : kupiti[itemId];
+    const itemToDelete = lists[listName][itemId];
 
-    setAnimatingItems(prev => new Set(prev).add(itemId));
+    setAnimatingItems(prev => {
+      const newSet = new Set(prev);
+      newSet.add(itemId);
+      return newSet;
+    });
     
     setTimeout(() => {
       setAnimatingItems(prev => {
@@ -291,19 +303,12 @@ export default function App() {
       });
     }, 400);
 
-    if (listName === "imamo") {
-      setImamo(prev => {
-        const updated = { ...prev };
-        delete updated[itemId];
-        return updated;
-      });
-    } else {
-      setKupiti(prev => {
-        const updated = { ...prev };
-        delete updated[itemId];
-        return updated;
-      });
-    }
+    setLists(prev => ({
+      ...prev,
+      [listName]: Object.fromEntries(
+        Object.entries(prev[listName]).filter(([id]) => id !== itemId)
+      )
+    }));
 
     try {
       const itemRef = ref(database, `shoppingList/${listName}/${itemId}`);
@@ -319,10 +324,13 @@ export default function App() {
     } catch (error) {
       console.error("Error deleting item:", error);
       setError("Failed to delete item. Please try again.");
+      setLists(prev => ({
+        ...prev,
+        [listName]: { ...prev[listName], [itemId]: itemToDelete }
+      }));
     }
   };
 
-  // Open tag modal instead of directly adding item
   const initiateAddItem = () => {
     const trimmedItem = newItem.trim();
     
@@ -339,7 +347,6 @@ export default function App() {
     setShowTagModal(true);
   };
 
-  // Add new custom tag
   const addCustomTag = async () => {
     const trimmedTagName = newTagName.trim();
     
@@ -360,7 +367,7 @@ export default function App() {
       await set(tagRef, newTagColor);
       
       setNewTagName("");
-      setNewTagColor("#6366f1");
+      setNewTagColor("#FFB347");
       setShowAddTag(false);
       setError(null);
     } catch (error) {
@@ -369,7 +376,6 @@ export default function App() {
     }
   };
 
-  // Confirm and add item with selected tag
   const confirmAddItem = async () => {
     if (!selectedTag) {
       setError("Please select a tag!");
@@ -387,9 +393,12 @@ export default function App() {
         tag: selectedTag
       };
 
-      setKupiti(prev => ({
+      setLists(prev => ({
         ...prev,
-        [uniqueId]: item
+        kupiti: {
+          ...prev.kupiti,
+          [uniqueId]: item
+        }
       }));
 
       const itemRef = ref(database, `shoppingList/kupiti/${uniqueId}`);
@@ -402,7 +411,12 @@ export default function App() {
       setSelectedTag("");
       setError(null);
 
-      setAnimatingItems(prev => new Set(prev).add(uniqueId));
+      setAnimatingItems(prev => {
+        const newSet = new Set(prev);
+        newSet.add(uniqueId);
+        return newSet;
+      });
+      
       setTimeout(() => {
         setAnimatingItems(prev => {
           const newSet = new Set(prev);
@@ -414,15 +428,30 @@ export default function App() {
       console.error("Error adding item:", error);
       setError("Failed to add item. Please try again.");
       
-      setKupiti(prev => {
-        const reverted = { ...prev };
-        delete reverted[uniqueId];
-        return reverted;
-      });
+      setLists(prev => ({
+        ...prev,
+        kupiti: Object.fromEntries(
+          Object.entries(prev.kupiti).filter(([id]) => id !== uniqueId)
+        )
+      }));
     }
   };
 
-  // Group items by tag
+  const updateRecipeDescription = async (recipeId, description, recipe) => {
+    try {
+      const recipeRef = ref(database, `recipes/${recipeId}`);
+      await set(recipeRef, {
+        ...recipe,
+        description,
+        lastEditedAt: Date.now(),
+        lastEditedBy: username
+      });
+    } catch (error) {
+      console.error("Error updating recipe:", error);
+      setError("Failed to update recipe description.");
+    }
+  };
+
   const groupByTag = (items) => {
     const grouped = {};
     
@@ -437,24 +466,45 @@ export default function App() {
     return grouped;
   };
 
-  const userColors = {
-    Mare: "blue",
-    Caka: "deeppink",
+  const getRecipeIngredientStatus = (ingredients) => {
+    const statusMap = {};
+    
+    Object.keys(ingredients || {}).forEach((ing) => {
+      const normalizedIng = ing.toLowerCase().trim();
+      
+      const inImamo = Object.values(lists.imamo).some(
+        item => item.name.toLowerCase() === normalizedIng
+      );
+      
+      const inKupiti = Object.values(lists.kupiti).some(
+        item => item.name.toLowerCase() === normalizedIng
+      );
+
+      if (inImamo) {
+        statusMap[ing] = "have";
+      } else if (inKupiti) {
+        statusMap[ing] = "buy";
+      } else {
+        statusMap[ing] = "missing";
+      }
+    });
+
+    return statusMap;
   };
 
   if (loading) {
     return (
       <div style={styles.loadingContainer}>
         <div style={styles.spinner}></div>
-        <p>Loading...</p>
+        <p style={styles.loadingText}>Loading your happy list... ✨</p>
       </div>
     );
   }
 
-  const imamoGrouped = groupByTag(imamo);
-  const kupitiGrouped = groupByTag(kupiti);
-  const imamoCount = Object.keys(imamo).length;
-  const kupitiCount = Object.keys(kupiti).length;
+  const imamoGrouped = groupByTag(lists.imamo);
+  const kupitiGrouped = groupByTag(lists.kupiti);
+  const imamoCount = Object.keys(lists.imamo).length;
+  const kupitiCount = Object.keys(lists.kupiti).length;
 
   const otherOnlineUsers = Object.entries(onlineUsers)
     .filter(([name, data]) => name !== username && data.online)
@@ -466,7 +516,7 @@ export default function App() {
       <div style={styles.fixedBannerContainer}>
         {error && (
           <div style={styles.errorBanner}>
-            <span>⚠️ {error}</span>
+            <span>😕 {error}</span>
             <button style={styles.closeError} onClick={() => setError(null)}>✖</button>
           </div>
         )}
@@ -475,36 +525,32 @@ export default function App() {
           <div style={styles.undoBanner}>
             <span>
               {undoStack[0].type === "move" 
-                ? `Moved "${undoStack[0].itemName}"` 
-                : `Deleted "${undoStack[0].itemName}"`}
+                ? `✨ Moved "${undoStack[0].itemName}"` 
+                : `🗑️ Deleted "${undoStack[0].itemName}"`}
             </span>
             <button style={styles.undoButton} onClick={performUndo}>
-              ↶ Undo
+              ↩️ Undo
             </button>
           </div>
         )}
       </div>
 
+      {/* Top Bar */}
       <div style={styles.topBar}>
         <div style={styles.navContainer}>
-          {/* Username and Online Status */}
           <div style={styles.userInfo}>
-            <span style={{ ...styles.username, color: userColors[username] || "#6b7280" }}>
-              {username}
-            </span>
-            {otherOnlineUsers.length > 0 && (
-              <span style={styles.onlineBadge}>
-                <span style={styles.onlineDot}>●</span>
-                {otherOnlineUsers.join(", ")}
+            <div style={styles.welcomeText}>
+              <span style={{ ...styles.username, color: USER_COLORS[username] || "#FF8A5C" }}>
+                {username}
               </span>
+            </div>
+            {otherOnlineUsers.length > 0 && (
+              <div style={styles.onlineBadge}>
+                <span style={styles.onlineDot}>●</span>
+                <span style={styles.onlineText}>{otherOnlineUsers.join(", ")} online</span>
+              </div>
             )}
           </div>
-
-          {/* Navigation Buttons */}
-          
-
-          {/* Logout Button */}
-          
         </div>
       </div>
 
@@ -512,7 +558,9 @@ export default function App() {
       {showTagModal && (
         <div style={styles.modalOverlay} onClick={() => setShowTagModal(false)}>
           <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
-            <h3 style={styles.modalTitle}>Select Tag for "{pendingItemName}"</h3>
+            <h3 style={styles.modalTitle}>
+              🏷️ Pick a tag for<br />"{pendingItemName}"
+            </h3>
             
             <div style={styles.tagGrid}>
               {Object.entries(availableTags).map(([tagName, color]) => (
@@ -520,20 +568,20 @@ export default function App() {
                   key={tagName}
                   style={{
                     ...styles.tagOption,
+                    backgroundColor: selectedTag === tagName ? color : "white",
+                    color: selectedTag === tagName ? "white" : color,
                     borderColor: color,
-                    backgroundColor: selectedTag === tagName ? `${color}20` : "transparent",
-                    borderWidth: selectedTag === tagName ? "3px" : "2px"
                   }}
                   onClick={() => setSelectedTag(tagName)}
                 >
-                  <span style={{ color: color, fontWeight: "600" }}>{tagName}</span>
+                  {tagName}
                 </button>
               ))}
             </div>
 
             {!showAddTag ? (
               <button style={styles.addNewTagButton} onClick={() => setShowAddTag(true)}>
-                + Add New Tag
+                ✨ Create New Tag
               </button>
             ) : (
               <div style={styles.newTagForm}>
@@ -550,16 +598,18 @@ export default function App() {
                   onChange={(e) => setNewTagColor(e.target.value)}
                   style={styles.colorPicker}
                 />
-                <button style={styles.saveTagButton} onClick={addCustomTag}>
-                  Save Tag
-                </button>
-                <button style={styles.cancelTagButton} onClick={() => {
-                  setShowAddTag(false);
-                  setNewTagName("");
-                  setNewTagColor("#6366f1");
-                }}>
-                  Cancel
-                </button>
+                <div style={styles.newTagActions}>
+                  <button style={styles.saveTagButton} onClick={addCustomTag}>
+                    Save
+                  </button>
+                  <button style={styles.cancelTagButton} onClick={() => {
+                    setShowAddTag(false);
+                    setNewTagName("");
+                    setNewTagColor("#FFB347");
+                  }}>
+                    Cancel
+                  </button>
+                </div>
               </div>
             )}
 
@@ -572,52 +622,61 @@ export default function App() {
                   setNewTagName("");
                 }}
               >
-                Cancel
+                Maybe Later
               </button>
               <button 
                 style={{
                   ...styles.confirmButton,
                   opacity: !selectedTag ? 0.5 : 1,
-                  cursor: !selectedTag ? "not-allowed" : "pointer"
                 }}
                 onClick={confirmAddItem}
                 disabled={!selectedTag}
               >
-                Add Item
+                Add to List ✨
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Main Content - Shopping Lists */}
+      {/* Main Content */}
       {currentPage === "shopping" && (
-        <div className="content">
-          {/* Left Table - Kupiti */}
-          <div>
-            {/* Input Field and Button */}
-            
-            
-            <h2 style={styles.header}>Kupiti ({kupitiCount})</h2>
-            <div style={styles.table}>
+        <div style={styles.shoppingContent}>
+          {/* Left Column - Kupiti */}
+          <div style={styles.column}>
+            <div style={styles.columnHeader}>
+              <h2 style={styles.header}>
+                <span style={styles.headerEmoji}>🛒</span>
+                Kupiti
+              </h2>
+              <span style={styles.countBadge}>{kupitiCount}</span>
+            </div>
+            <div style={styles.listContainer}>
               {Object.keys(kupitiGrouped).length === 0 ? (
-                <div style={styles.emptyState}>No items to buy</div>
+                <div style={styles.emptyState}>
+                  <span style={styles.emptyEmoji}>🎉</span>
+                  <p>Nothing to buy!<br />Time to relax!</p>
+                </div>
               ) : (
                 Object.entries(kupitiGrouped).map(([tag, items]) => (
                   <div key={tag} style={styles.tagGroup}>
                     <div style={styles.tagHeader}>
-                      <span className={`tag-chip ${tag.toLowerCase()}`}>
+                      <span style={{
+                        ...styles.tagChip,
+                        backgroundColor: availableTags[tag] || "#FFB347",
+                      }}>
                         {tag}
                       </span>
-                      <span style={styles.tagCount}>({items.length})</span>
+                      <span style={styles.tagCount}>{items.length}</span>
                     </div>
-                    <ul style={styles.itemList}>
+                    <div style={styles.itemList}>
                       {items.map((item) => (
-                        <li
+                        <div
                           key={item.id}
-                          className={`shopping-card ${
-                            animatingItems.has(item.id) ? "animate-in" : ""
-                          }`}
+                          style={{
+                            ...styles.itemCard,
+                            animation: animatingItems.has(item.id) ? "bounceIn 0.4s ease-out" : "none",
+                          }}
                           onClick={() =>
                             moveItem(
                               item.id,
@@ -632,68 +691,76 @@ export default function App() {
                             )
                           }
                         >
-                         <div className="item-name">{item.name}</div>
-                         <div className="item-meta">
-                            added by{" "}
-                            <span style={{ color: userColors[item.addedBy] || "#6b7280" }}>
-                              {item.addedBy}
+                          <div style={styles.itemContent}>
+                            <span style={styles.itemName}>{item.name}</span>
+                            <span style={styles.itemMeta}>
+                              by <span style={{ color: USER_COLORS[item.addedBy] || "#FF8A5C" }}>
+                                {item.addedBy}
+                              </span>
                             </span>
-                         </div>
+                          </div>
                           <button
                             style={styles.deleteButton}
                             onClick={(e) => {
                               e.stopPropagation();
                               deleteItem(item.id, "kupiti", item.name);
                             }}
-                            onMouseEnter={(e) => e.target.style.color = "#dc2626"}
-                            onMouseLeave={(e) => e.target.style.color = "#ef4444"}
                           >
-                            ✖
+                            ✕
                           </button>
-                        </li>
+                        </div>
                       ))}
-                    </ul>
+                    </div>
                   </div>
                 ))
               )}
             </div>
           </div>
 
-          {/* Right Table - Imamo */}
-          <div>
-            <h2 style={styles.header}>Imamo ({imamoCount})</h2>
-            <div style={styles.table}>
+          {/* Right Column - Imamo */}
+          <div style={styles.column}>
+            <div style={styles.columnHeader}>
+              <h2 style={styles.header}>
+                <span style={styles.headerEmoji}>✅</span>
+                Imamo
+              </h2>
+              <span style={styles.countBadge}>{imamoCount}</span>
+            </div>
+            <div style={styles.listContainer}>
               {Object.keys(imamoGrouped).length === 0 ? (
-                <div style={styles.emptyState}>No items yet</div>
+                <div style={styles.emptyState}>
+                  <span style={styles.emptyEmoji}>🛍️</span>
+                  <p>Your list is empty!<br />Time to shop!</p>
+                </div>
               ) : (
                 Object.entries(imamoGrouped).map(([tag, items]) => (
                   <div key={tag} style={styles.tagGroup}>
                     <div style={styles.tagHeader}>
-                      <span className={`tag-chip ${tag.toLowerCase()}`}>
+                      <span style={{
+                        ...styles.tagChip,
+                        backgroundColor: availableTags[tag] || "#FFB347",
+                      }}>
                         {tag}
                       </span>
-                      <span style={styles.tagCount}>({items.length})</span>
+                      <span style={styles.tagCount}>{items.length}</span>
                     </div>
-                    <ul style={styles.itemList}>
+                    <div style={styles.itemList}>
                       {items.map((item) => (
-                        <li
+                        <div
                           key={item.id}
-                          className={`shopping-card ${
-                            animatingItems.has(item.id) ? "animate-in" : ""
-                          }`}
+                          style={{
+                            ...styles.itemCard,
+                            animation: animatingItems.has(item.id) ? "bounceIn 0.4s ease-out" : "none",
+                          }}
                           onClick={() => moveItem(item.id, { name: item.name, addedBy: item.addedBy, addedAt: item.addedAt, tag: item.tag }, "imamo", "kupiti")}
-                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#f3f4f6"}
-                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
                         >
-                          <div style={styles.itemText}>
-                            <strong>{item.name}</strong>
-                            <br />
-                            <small>
-                              added by{" "}
-                              <span style={{ color: userColors[item.addedBy] || "#6b7280" }}>
+                          <div style={styles.itemContent}>
+                            <span style={styles.itemName}>{item.name}</span>
+                            <span style={styles.itemMeta}>
+                              by <span style={{ color: USER_COLORS[item.addedBy] || "#FF8A5C" }}>
                                 {item.addedBy}
                               </span>
-                            </small>
+                            </span>
                           </div>
                           <button
                             style={styles.deleteButton}
@@ -701,14 +768,12 @@ export default function App() {
                               e.stopPropagation();
                               deleteItem(item.id, "imamo", item.name);
                             }}
-                            onMouseEnter={(e) => e.target.style.color = "#dc2626"}
-                            onMouseLeave={(e) => e.target.style.color = "#ef4444"}
                           >
-                            ✖
+                            ✕
                           </button>
-                        </li>
+                        </div>
                       ))}
-                    </ul>
+                    </div>
                   </div>
                 ))
               )}
@@ -719,61 +784,117 @@ export default function App() {
 
       {/* Kuhinjica Page */}
       {currentPage === "kuhinjica" && (
-        <div className="content">
-          <div style={styles.kuhinjicaPage}>
-            <h2 style={styles.kuhinjicaTitle}>🍳 Kuhinjica</h2>
-            <p style={styles.kuhinjicaText}>Coming soon...</p>
-          </div>
+        <div style={styles.recipesContent}>
+          {Object.entries(recipes).map(([id, recipe]) => (
+            <div key={id} style={styles.recipeCard}>
+              <img
+                src={recipe.image}
+                alt={recipe.name}
+                style={styles.recipeImage}
+              />
+              <h3 style={styles.recipeTitle}>{recipe.name}</h3>
+
+              <div style={styles.ingredientsSection}>
+                <h4 style={styles.ingredientsTitle}>🧂 Ingredients</h4>
+                {Object.entries(recipe.ingredients || {}).map(([ing, data]) => {
+                  const ingredientStatuses = getRecipeIngredientStatus(recipe.ingredients);
+                  const status = ingredientStatuses[ing];
+
+                  return (
+                    <div
+                      key={ing}
+                      style={{
+                        ...styles.ingredientItem,
+                        ...styles[`ingredient${status.charAt(0).toUpperCase() + status.slice(1)}`]
+                      }}
+                    >
+                      <span>{ing}</span>
+                      <span style={styles.ingredientQuantity}>({data.quantity})</span>
+                      <span style={styles.ingredientIcon}>
+                        {status === "have" && "✅"}
+                        {status === "buy" && "🛒"}
+                        {status === "missing" && "❌"}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <textarea
+                value={recipe.description || ""}
+                onChange={(e) => updateRecipeDescription(id, e.target.value, recipe)}
+                placeholder="📝 Add cooking notes..."
+                style={styles.textarea}
+              />
+
+              <div style={styles.recipeFooter}>
+                <small style={styles.editInfo}>
+                  Last edit: {recipe.lastEditedBy || "unknown"} •{" "}
+                  {recipe.lastEditedAt
+                    ? new Date(recipe.lastEditedAt).toLocaleDateString()
+                    : "never"}
+                </small>
+              </div>
+            </div>
+          ))}
         </div>
       )}
-      <div className="bottom-nav">
+
+      {/* Bottom Navigation */}
+      <div style={styles.bottomNav}>
         <button
-          className={`nav-btn ${currentPage === "shopping" ? "active" : ""}`}
+          style={{
+            ...styles.navButton,
+            ...(currentPage === "shopping" ? styles.navButtonActive : {})
+          }}
           onClick={() => setCurrentPage("shopping")}
         >
-          🛒
-          <small>Lista</small>
+          <span style={styles.navIcon}>🛒</span>
+          <span style={styles.navLabel}>Lista</span>
         </button>
 
         <button
-          className={`nav-btn ${currentPage === "kuhinjica" ? "active" : ""}`}
+          style={{
+            ...styles.navButton,
+            ...(currentPage === "kuhinjica" ? styles.navButtonActive : {})
+          }}
           onClick={() => setCurrentPage("kuhinjica")}
         >
-          🍳
-          <small>Kuhinja</small>
+          <span style={styles.navIcon}>🍳</span>
+          <span style={styles.navLabel}>Kuhinjica</span>
         </button>
 
         <button
-          className="nav-btn"
+          style={styles.navButton}
           onClick={handleLogout}
         >
-          ⏻
-          <small>Logout</small>
+          <span style={styles.navIcon}>❌</span>
+          <span style={styles.navLabel}>Exit</span>
         </button>
       </div>
 
-      <div className="add-bar">
+      {/* Add Item Bar */}
+      <div style={styles.addBar}>
         <input
           type="text"
           value={newItem}
-          placeholder="Add milk..."
+          placeholder="Add bananas, milk, bread..."
           onChange={(e) => setNewItem(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter") {
               initiateAddItem();
             }
           }}
+          style={styles.addInput}
         />
-
         <button
-          className="add-btn"
+          style={styles.addButton}
           onClick={initiateAddItem}
           disabled={!newItem.trim()}
         >
-          +
+          <span style={styles.addButtonText}>+</span>
         </button>
       </div>
-
     </div>
   );
 }
@@ -784,10 +905,11 @@ const styles = {
     flexDirection: "column",
     alignItems: "center",
     minHeight: "100vh",
-    background: "linear-gradient(to bottom right, #e5e7eb, #f9fafb)",
+    background: "linear-gradient(135deg, #FFF9E6 0%, #FFE8D6 100%)",
     padding: "0",
-    paddingTop: "5rem",
-    paddingBottom: "2rem",
+    paddingTop: "4rem",
+    paddingBottom: "7rem",
+    fontFamily: "'Poppins', -apple-system, BlinkMacSystemFont, sans-serif",
   },
   fixedBannerContainer: {
     position: "fixed",
@@ -798,9 +920,8 @@ const styles = {
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
-    padding: "1rem",
+    padding: "0.5rem",
     gap: "0.5rem",
-    backgroundColor: "transparent",
     pointerEvents: "none",
   },
   loadingContainer: {
@@ -809,17 +930,21 @@ const styles = {
     justifyContent: "center",
     alignItems: "center",
     minHeight: "100vh",
-    fontSize: "1.2rem",
-    color: "#6b7280",
+    background: "linear-gradient(135deg, #FFF9E6 0%, #FFE8D6 100%)",
   },
   spinner: {
-    width: "40px",
-    height: "40px",
-    border: "4px solid #e5e7eb",
-    borderTop: "4px solid #3b82f6",
+    width: "50px",
+    height: "50px",
+    border: "4px solid rgba(255, 107, 107, 0.2)",
+    borderTop: "4px solid #FF6B6B",
     borderRadius: "50%",
     animation: "spin 1s linear infinite",
     marginBottom: "1rem",
+  },
+  loadingText: {
+    fontSize: "1.2rem",
+    color: "#FF8A5C",
+    fontWeight: "600",
   },
   topBar: {
     position: "fixed",
@@ -827,145 +952,99 @@ const styles = {
     left: "0",
     right: "0",
     width: "100%",
-    backgroundColor: "white",
-    borderBottom: "2px solid #e5e7eb",
-    boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
+    backgroundColor: "rgba(255, 255, 255, 0.9)",
+    backdropFilter: "blur(10px)",
+    borderBottom: "1px solid rgba(255, 107, 107, 0.2)",
+    boxShadow: "0 4px 20px rgba(255, 107, 107, 0.1)",
     zIndex: 999,
   },
   navContainer: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "0.75rem",
     padding: "0.75rem 1rem",
-    maxWidth: "1200px",
-    margin: "0 auto",
   },
   userInfo: {
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
+  },
+  welcomeText: {
+    display: "flex",
+    alignItems: "center",
     gap: "0.5rem",
-    flexWrap: "wrap",
+  },
+  welcomeEmoji: {
+    fontSize: "1.2rem",
   },
   username: {
-    fontSize: "0.95rem",
+    fontSize: "1rem",
     fontWeight: "700",
+    background: "linear-gradient(135deg, #FF6B6B, #FF8A5C)",
+    WebkitBackgroundClip: "text",
+    WebkitTextFillColor: "transparent",
   },
   onlineBadge: {
     display: "flex",
     alignItems: "center",
     gap: "0.25rem",
-    fontSize: "0.75rem",
-    color: "#6b7280",
-    backgroundColor: "#f0fdf4",
-    padding: "0.25rem 0.5rem",
-    borderRadius: "0.375rem",
-    border: "1px solid #bbf7d0",
+    padding: "0.25rem 0.75rem",
+    backgroundColor: "#A8E6CF",
+    borderRadius: "20px",
   },
   onlineDot: {
-    color: "#22c55e",
-    fontSize: "0.6rem",
+    color: "#2ecc71",
+    fontSize: "0.8rem",
   },
-  navTabs: {
-    display: "flex",
-    gap: "0.5rem",
-    backgroundColor: "#f3f4f6",
-    padding: "0.25rem",
-    borderRadius: "0.5rem",
-  },
-  navTab: {
-    flex: 1,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "0.5rem",
-    padding: "0.6rem 1rem",
-    border: "none",
-    borderRadius: "0.375rem",
-    cursor: "pointer",
-    fontSize: "0.9rem",
-    fontWeight: "600",
-    transition: "all 0.2s",
-    backgroundColor: "transparent",
-    color: "#6b7280",
-  },
-  navTabActive: {
-    backgroundColor: "white",
-    color: "#3b82f6",
-    boxShadow: "0 1px 3px rgba(0, 0, 0, 0.1)",
-  },
-  tabIcon: {
-    fontSize: "1.2rem",
-  },
-  tabText: {
-    fontSize: "0.9rem",
-  },
-  logoutBtn: {
-    position: "absolute",
-    top: "0.75rem",
-    right: "1rem",
-    width: "2.5rem",
-    height: "2.5rem",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#ef4444",
-    color: "white",
-    border: "none",
-    borderRadius: "0.5rem",
-    cursor: "pointer",
-    fontSize: "1.2rem",
-    fontWeight: "600",
-    transition: "background-color 0.2s",
-    boxShadow: "0 1px 3px rgba(0, 0, 0, 0.1)",
+  onlineText: {
+    fontSize: "0.8rem",
+    color: "#2c3e50",
+    fontWeight: "500",
   },
   errorBanner: {
-    width: "100%",
-    maxWidth: "600px",
+    width: "90%",
+    maxWidth: "400px",
     padding: "0.75rem 1rem",
-    backgroundColor: "#fef2f2",
-    border: "1px solid #fecaca",
-    borderRadius: "0.5rem",
+    backgroundColor: "#FFE5E5",
+    border: "1px solid #FF6B6B",
+    borderRadius: "12px",
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
-    color: "#991b1b",
+    color: "#FF6B6B",
     fontSize: "0.9rem",
     animation: "slideIn 0.3s ease-out",
-    boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
+    boxShadow: "0 4px 12px rgba(255, 107, 107, 0.2)",
     pointerEvents: "auto",
   },
   undoBanner: {
-    width: "100%",
-    maxWidth: "600px",
+    width: "90%",
+    maxWidth: "400px",
     padding: "0.75rem 1rem",
-    backgroundColor: "#f0f9ff",
-    border: "1px solid #bae6fd",
-    borderRadius: "0.5rem",
+    backgroundColor: "#E5F6FF",
+    border: "1px solid #4ECDC4",
+    borderRadius: "12px",
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
-    color: "#075985",
+    color: "#4ECDC4",
     fontSize: "0.9rem",
     animation: "slideIn 0.3s ease-out",
-    boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
+    boxShadow: "0 4px 12px rgba(78, 205, 196, 0.2)",
     pointerEvents: "auto",
   },
   undoButton: {
-    padding: "0.25rem 0.75rem",
-    backgroundColor: "#0284c7",
+    padding: "0.4rem 1rem",
+    backgroundColor: "#4ECDC4",
     color: "white",
     border: "none",
-    borderRadius: "0.375rem",
+    borderRadius: "20px",
     cursor: "pointer",
-    fontSize: "0.9rem",
-    fontWeight: "500",
-    transition: "background-color 0.2s",
+    fontSize: "0.85rem",
+    fontWeight: "600",
+    transition: "all 0.2s",
   },
   closeError: {
     background: "none",
     border: "none",
-    color: "#991b1b",
+    color: "#FF6B6B",
     cursor: "pointer",
     fontSize: "1rem",
     padding: "0",
@@ -985,146 +1064,165 @@ const styles = {
   },
   modalContent: {
     backgroundColor: "white",
-    borderRadius: "1rem",
-    padding: "2rem",
-    maxWidth: "500px",
+    borderRadius: "24px",
+    padding: "1.5rem",
+    maxWidth: "400px",
     width: "100%",
-    boxShadow: "0 20px 25px -5px rgba(0,0,0,0.3)",
+    boxShadow: "0 20px 40px rgba(255, 107, 107, 0.2)",
   },
   modalTitle: {
-    fontSize: "1.5rem",
-    fontWeight: "bold",
+    fontSize: "1.3rem",
+    fontWeight: "700",
     marginBottom: "1.5rem",
-    color: "#374151",
+    color: "#FF8A5C",
     textAlign: "center",
+    lineHeight: "1.4",
   },
   tagGrid: {
     display: "grid",
-    gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))",
-    gap: "0.75rem",
-    marginBottom: "1.5rem",
+    gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))",
+    gap: "0.5rem",
+    marginBottom: "1rem",
   },
   tagOption: {
-    padding: "0.75rem",
-    borderRadius: "0.5rem",
+    padding: "0.6rem",
+    borderRadius: "20px",
     border: "2px solid",
     cursor: "pointer",
-    fontSize: "0.9rem",
-    fontWeight: "500",
+    fontSize: "0.85rem",
+    fontWeight: "600",
     textAlign: "center",
     transition: "all 0.2s",
-    backgroundColor: "transparent",
   },
   addNewTagButton: {
     width: "100%",
     padding: "0.75rem",
-    backgroundColor: "#f3f4f6",
-    color: "#374151",
-    border: "2px dashed #d1d5db",
-    borderRadius: "0.5rem",
+    backgroundColor: "#FFF9E6",
+    color: "#FF8A5C",
+    border: "2px dashed #FFB347",
+    borderRadius: "12px",
     cursor: "pointer",
     fontSize: "0.9rem",
-    fontWeight: "500",
+    fontWeight: "600",
     marginBottom: "1rem",
     transition: "all 0.2s",
   },
   newTagForm: {
     display: "flex",
-    gap: "0.5rem",
+    flexDirection: "column",
+    gap: "0.75rem",
     marginBottom: "1rem",
-    flexWrap: "wrap",
   },
   newTagInput: {
-    flex: 1,
-    minWidth: "150px",
-    padding: "0.5rem",
-    border: "1px solid #d1d5db",
-    borderRadius: "0.375rem",
+    width: "100%",
+    padding: "0.75rem",
+    border: "2px solid #FFE8D6",
+    borderRadius: "12px",
     fontSize: "0.9rem",
   },
   colorPicker: {
-    width: "60px",
-    height: "38px",
-    border: "1px solid #d1d5db",
-    borderRadius: "0.375rem",
+    width: "100%",
+    height: "44px",
+    border: "2px solid #FFE8D6",
+    borderRadius: "12px",
     cursor: "pointer",
+  },
+  newTagActions: {
+    display: "flex",
+    gap: "0.5rem",
   },
   saveTagButton: {
-    padding: "0.5rem 1rem",
-    backgroundColor: "#16a34a",
+    flex: 1,
+    padding: "0.6rem",
+    backgroundColor: "#4ECDC4",
     color: "white",
     border: "none",
-    borderRadius: "0.375rem",
+    borderRadius: "12px",
     cursor: "pointer",
     fontSize: "0.9rem",
-    fontWeight: "500",
+    fontWeight: "600",
   },
   cancelTagButton: {
-    padding: "0.5rem 1rem",
-    backgroundColor: "#ef4444",
-    color: "white",
+    flex: 1,
+    padding: "0.6rem",
+    backgroundColor: "#FFE5E5",
+    color: "#FF6B6B",
     border: "none",
-    borderRadius: "0.375rem",
+    borderRadius: "12px",
     cursor: "pointer",
     fontSize: "0.9rem",
-    fontWeight: "500",
+    fontWeight: "600",
   },
   modalActions: {
     display: "flex",
-    justifyContent: "flex-end",
     gap: "0.75rem",
-    marginTop: "1.5rem",
+    marginTop: "1rem",
   },
   cancelButton: {
-    padding: "0.75rem 1.5rem",
-    backgroundColor: "#f3f4f6",
-    color: "#374151",
+    flex: 1,
+    padding: "0.75rem",
+    backgroundColor: "#f0f0f0",
+    color: "#666",
     border: "none",
-    borderRadius: "0.5rem",
+    borderRadius: "12px",
     cursor: "pointer",
-    fontSize: "1rem",
-    fontWeight: "500",
-    transition: "background-color 0.2s",
+    fontSize: "0.9rem",
+    fontWeight: "600",
   },
   confirmButton: {
-    padding: "0.75rem 1.5rem",
-    backgroundColor: "#3b82f6",
+    flex: 1,
+    padding: "0.75rem",
+    background: "linear-gradient(135deg, #FF6B6B, #FF8A5C)",
     color: "white",
     border: "none",
-    borderRadius: "0.5rem",
+    borderRadius: "12px",
     cursor: "pointer",
-    fontSize: "1rem",
-    fontWeight: "500",
-    transition: "all 0.2s",
+    fontSize: "0.9rem",
+    fontWeight: "600",
   },
-  container: {
-    display: "grid",
-    gridTemplateColumns: "1fr",
-    gap: "2rem",
-    padding: "2rem",
-    backgroundColor: "#fff",
-    borderRadius: "1rem",
-    boxShadow: "0 20px 25px -5px rgba(0,0,0,0.1)",
-    border: "1px solid #d1d5db",
+  shoppingContent: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "1.5rem",
     width: "100%",
-    maxWidth: "600px",
-    margin: "0 1rem",
+    maxWidth: "500px",
+    padding: "1rem",
+  },
+  column: {
+    width: "100%",
+  },
+  columnHeader: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: "0.75rem",
+    padding: "0 0.5rem",
   },
   header: {
-    fontSize: "1.5rem",
-    fontWeight: "bold",
-    marginBottom: "1rem",
-    color: "#374151",
-    textAlign: "center",
+    fontSize: "1.4rem",
+    fontWeight: "700",
+    color: "#FF6B6B",
+    display: "flex",
+    alignItems: "center",
+    gap: "0.5rem",
   },
-  table: {
-    border: "1px solid #e5e7eb",
-    borderRadius: "0.5rem",
+  headerEmoji: {
+    fontSize: "1.8rem",
+  },
+  countBadge: {
+    backgroundColor: "white",
+    padding: "0.25rem 0.75rem",
+    borderRadius: "20px",
+    fontSize: "1rem",
+    fontWeight: "700",
+    color: "#FF8A5C",
+    boxShadow: "0 2px 8px rgba(255, 107, 107, 0.1)",
+  },
+  listContainer: {
+    backgroundColor: "white",
+    borderRadius: "20px",
     padding: "1rem",
-    backgroundColor: "#fff",
-    minWidth: "200px",
-    maxWidth: "100%",
-    minHeight: "100px",
+    boxShadow: "0 8px 20px rgba(255, 107, 107, 0.1)",
   },
   tagGroup: {
     marginBottom: "1.5rem",
@@ -1133,57 +1231,324 @@ const styles = {
     display: "flex",
     alignItems: "center",
     gap: "0.5rem",
-    marginBottom: "0.5rem",
+    marginBottom: "0.75rem",
   },
-  tagLabel: {
-    padding: "0.25rem 0.75rem",
-    borderRadius: "0.375rem",
-    border: "2px solid",
-    fontSize: "0.875rem",
+  tagChip: {
+    padding: "0.3rem 1rem",
+    borderRadius: "20px",
+    color: "white",
+    fontSize: "0.85rem",
     fontWeight: "600",
   },
   tagCount: {
-    fontSize: "0.875rem",
-    color: "#6b7280",
+    fontSize: "0.8rem",
+    color: "#999",
     fontWeight: "500",
   },
   itemList: {
-    listStyle: "none",
-    padding: 0,
-    margin: 0,
+    display: "flex",
+    flexDirection: "column",
+    gap: "0.5rem",
   },
-  emptyState: {
-    padding: "1rem",
-    textAlign: "center",
-    color: "#9ca3af",
-    fontStyle: "italic",
+  itemCard: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: "0.75rem",
+    backgroundColor: "#FFF9E6",
+    borderRadius: "12px",
+    border: "1px solid #FFE8D6",
+    cursor: "pointer",
+    transition: "all 0.2s",
+  },
+  itemContent: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "0.25rem",
+  },
+  itemName: {
+    fontSize: "1rem",
+    fontWeight: "600",
+    color: "#2c3e50",
+  },
+  itemMeta: {
+    fontSize: "0.7rem",
+    color: "#95a5a6",
   },
   deleteButton: {
-    color: "#ef4444",
-    background: "none",
+    width: "32px",
+    height: "32px",
+    backgroundColor: "transparent",
+    color: "#FF6B6B",
     border: "none",
+    borderRadius: "50%",
     fontSize: "1.2rem",
     cursor: "pointer",
-    padding: "0.25rem 0.5rem",
-    transition: "color 0.2s",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    transition: "all 0.2s",
   },
-  kuhinjicaPage: {
+  emptyState: {
+    padding: "2rem 1rem",
+    textAlign: "center",
+    color: "#FFB347",
+    fontSize: "1rem",
+    fontWeight: "500",
+  },
+  emptyEmoji: {
+    fontSize: "2.5rem",
+    display: "block",
+    marginBottom: "0.5rem",
+  },
+  recipesContent: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "1rem",
+    width: "100%",
+    maxWidth: "500px",
+    padding: "1rem",
+  },
+  recipeCard: {
+    backgroundColor: "white",
+    borderRadius: "24px",
+    padding: "1.5rem",
+    boxShadow: "0 8px 20px rgba(255, 107, 107, 0.1)",
+    border: "1px solid #FFE8D6",
+  },
+  recipeImage: {
+    width: "100%",
+    height: "200px",
+    objectFit: "cover",
+    borderRadius: "16px",
+    marginBottom: "1rem",
+  },
+  recipeTitle: {
+    fontSize: "1.3rem",
+    fontWeight: "700",
+    color: "#FF6B6B",
+    marginBottom: "1rem",
+  },
+  ingredientsSection: {
+    marginBottom: "1rem",
+  },
+  ingredientsTitle: {
+    fontSize: "1rem",
+    fontWeight: "600",
+    color: "#FF8A5C",
+    marginBottom: "0.5rem",
+  },
+  ingredientItem: {
+    display: "flex",
+    alignItems: "center",
+    gap: "0.5rem",
+    padding: "0.5rem",
+    marginBottom: "0.25rem",
+    borderRadius: "10px",
+    fontSize: "0.9rem",
+  },
+  ingredientQuantity: {
+    color: "#95a5a6",
+    fontSize: "0.8rem",
+  },
+  ingredientIcon: {
+    marginLeft: "auto",
+  },
+  ingredientHave: {
+    backgroundColor: "#E8F8F5",
+  },
+  ingredientBuy: {
+    backgroundColor: "#FFF5E6",
+  },
+  ingredientMissing: {
+    backgroundColor: "#FFE5E5",
+  },
+  textarea: {
+    width: "100%",
+    marginTop: "0.5rem",
+    borderRadius: "12px",
+    padding: "0.75rem",
+    border: "2px solid #FFE8D6",
+    minHeight: "80px",
+    fontSize: "0.9rem",
+    fontFamily: "inherit",
+  },
+  recipeFooter: {
+    marginTop: "1rem",
+    paddingTop: "0.5rem",
+    borderTop: "1px solid #FFE8D6",
+  },
+  editInfo: {
+    color: "#95a5a6",
+    fontSize: "0.7rem",
+  },
+  bottomNav: {
+    position: "fixed",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    display: "flex",
+    justifyContent: "space-around",
+    padding: "0.75rem 1rem",
+    backgroundColor: "rgba(255, 255, 255, 0.9)",
+    backdropFilter: "blur(10px)",
+    borderTop: "1px solid rgba(255, 107, 107, 0.2)",
+    boxShadow: "0 -4px 20px rgba(255, 107, 107, 0.1)",
+    zIndex: 999,
+  },
+  navButton: {
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
+    gap: "0.25rem",
+    padding: "0.5rem 1.5rem",
+    border: "none",
+    borderRadius: "20px",
+    cursor: "pointer",
+    fontSize: "0.8rem",
+    fontWeight: "600",
+    transition: "all 0.2s",
+    backgroundColor: "transparent",
+    color: "#666",
+  },
+  navButtonActive: {
+    background: "linear-gradient(135deg, #FF6B6B20, #FF8A5C20)",
+    color: "#FF6B6B",
+  },
+  navIcon: {
+    fontSize: "1.4rem",
+  },
+  navLabel: {
+    fontSize: "0.7rem",
+  },
+  addBar: {
+    position: "fixed",
+    bottom: "5rem",
+    left: "50%",
+    transform: "translateX(-50%)",
+    display: "flex",
+    gap: "0.5rem",
+    padding: "0.5rem",
+    backgroundColor: "white",
+    borderRadius: "30px",
+    boxShadow: "0 8px 25px rgba(255, 107, 107, 0.2)",
+    border: "2px solid #FFE8D6",
+    width: "90%",
+    maxWidth: "450px",
+  },
+  addInput: {
+    flex: 1,
+    padding: "0.8rem 1rem",
+    border: "none",
+    borderRadius: "30px",
+    fontSize: "0.95rem",
+    outline: "none",
+    backgroundColor: "transparent",
+  },
+  addButton: {
+    width: "44px",
+    height: "44px",
+    background: "linear-gradient(135deg, #FF6B6B, #FF8A5C)",
+    color: "white",
+    border: "none",
+    borderRadius: "50%",
+    cursor: "pointer",
+    display: "flex",
+    alignItems: "center",
     justifyContent: "center",
-    padding: "4rem 2rem",
-    textAlign: "center",
+    transition: "all 0.2s",
+    boxShadow: "0 4px 12px rgba(255, 107, 107, 0.3)",
   },
-  kuhinjicaTitle: {
-    fontSize: "2.5rem",
-    fontWeight: "bold",
-    color: "#374151",
-    marginBottom: "1rem",
-  },
-  kuhinjicaText: {
-    fontSize: "1.2rem",
-    color: "#6b7280",
-    fontStyle: "italic",
+  addButtonText: {
+    fontSize: "1.5rem",
+    fontWeight: "600",
+    lineHeight: "1",
   },
 };
+
+// Add global styles and animations
+const globalStyles = document.createElement('style');
+globalStyles.textContent = `
+  @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
+
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+
+  @keyframes slideIn {
+    from {
+      transform: translateY(-100%);
+      opacity: 0;
+    }
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+
+  @keyframes bounceIn {
+    0% {
+      transform: scale(0.3);
+      opacity: 0;
+    }
+    50% {
+      transform: scale(1.05);
+    }
+    70% {
+      transform: scale(0.9);
+    }
+    100% {
+      transform: scale(1);
+      opacity: 1;
+    }
+  }
+
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    font-family: 'Poppins', sans-serif;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  input, button, textarea {
+    font-family: inherit;
+  }
+
+  button:hover {
+    opacity: 0.9;
+  }
+
+  button:active {
+    transform: scale(0.98);
+  }
+
+  input:focus {
+    outline: none;
+  }
+
+  ::placeholder {
+    color: #FFB347;
+    opacity: 0.6;
+  }
+
+  /* Mobile optimizations */
+  @media (max-width: 480px) {
+    .shopping-content {
+      padding: 0.5rem;
+    }
+    
+    .item-card {
+      padding: 0.6rem;
+    }
+    
+    .nav-button {
+      padding: 0.5rem 1rem;
+    }
+  }
+`;
+document.head.appendChild(globalStyles);
