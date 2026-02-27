@@ -5,7 +5,7 @@ import App from "./App"; // Your main app page
 
 export default function Main() {
   return (
-    <Router basename="/KupovinaApp">
+    <Router>
       <Routes>
         <Route path="/" element={<Login />} />
         <Route path="/app" element={<App />} />
