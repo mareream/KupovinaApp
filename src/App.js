@@ -1,20 +1,21 @@
 import { useState, useEffect, useRef } from "react";
 import { database, ref, set, onValue, remove, auth, signOut, onAuthStateChanged } from "./firebase";
 import { useLocation, useNavigate } from "react-router-dom";
+import "./index.css"; // Import the CSS file
 
 // Default tags with vibrant colors
 const DEFAULT_TAGS = {
-  "DM": "#FF6B6B",      // Coral
-  "Maxi": "#4ECDC4",    // Turquoise
-  "VocPovrc": "#A8E6CF", // Mint
-  "Apoteka": "#FFD93D",  // Sunny Yellow
-  "Lidl": "#6C5CE7"      // Purple
+  "DM": "#FF6B6B",
+  "Maxi": "#4ECDC4",
+  "VocPovrc": "#A8E6CF",
+  "Apoteka": "#FFD93D",
+  "Lidl": "#6C5CE7"
 };
 
-// User colors - more vibrant
+// User colors
 const USER_COLORS = {
-  Mare: "#FF8A5C",      // Peach
-  Caka: "#FF6B9D",      // Pink
+  Mare: "#FF8A5C",
+  Caka: "#FF6B9D",
 };
 
 export default function App() {
@@ -36,7 +37,7 @@ export default function App() {
   const [pendingItemName, setPendingItemName] = useState("");
   const [selectedTag, setSelectedTag] = useState("");
   const [newTagName, setNewTagName] = useState("");
-  const [newTagColor, setNewTagColor] = useState("#FFB347"); // Warm orange default
+  const [newTagColor, setNewTagColor] = useState("#FFB347");
   const [showAddTag, setShowAddTag] = useState(false);
   
   const location = useLocation();
@@ -494,9 +495,9 @@ export default function App() {
 
   if (loading) {
     return (
-      <div style={styles.loadingContainer}>
-        <div style={styles.spinner}></div>
-        <p style={styles.loadingText}>Loading your happy list... ✨</p>
+      <div className="loading-container">
+        <div className="spinner"></div>
+        <p className="loading-text">Ucitavanje liste... ✨</p>
       </div>
     );
   }
@@ -511,24 +512,24 @@ export default function App() {
     .map(([name]) => name);
 
   return (
-    <div style={styles.page}>
+    <div className="app-page">
       {/* Fixed top banners */}
-      <div style={styles.fixedBannerContainer}>
+      <div className="fixed-banner-container">
         {error && (
-          <div style={styles.errorBanner}>
+          <div className="error-banner">
             <span>😕 {error}</span>
-            <button style={styles.closeError} onClick={() => setError(null)}>✖</button>
+            <button className="close-error" onClick={() => setError(null)}>✖</button>
           </div>
         )}
 
         {showUndo && undoStack.length > 0 && (
-          <div style={styles.undoBanner}>
+          <div className="undo-banner">
             <span>
               {undoStack[0].type === "move" 
-                ? `✨ Moved "${undoStack[0].itemName}"` 
-                : `🗑️ Deleted "${undoStack[0].itemName}"`}
+                ? `✨ Prebacen "${undoStack[0].itemName}"` 
+                : `🗑️ Obrisan "${undoStack[0].itemName}"`}
             </span>
-            <button style={styles.undoButton} onClick={performUndo}>
+            <button className="undo-btn" onClick={performUndo}>
               ↩️ Undo
             </button>
           </div>
@@ -536,18 +537,19 @@ export default function App() {
       </div>
 
       {/* Top Bar */}
-      <div style={styles.topBar}>
-        <div style={styles.navContainer}>
-          <div style={styles.userInfo}>
-            <div style={styles.welcomeText}>
-              <span style={{ ...styles.username, color: USER_COLORS[username] || "#FF8A5C" }}>
+      <div className="top-bar">
+        <div className="nav-container">
+          <div className="user-info">
+            <div className="welcome-text">
+              <span className="welcome-emoji">❤️</span>
+              <span className="username" style={{ color: USER_COLORS[username] || "#FF8A5C" }}>
                 {username}
               </span>
             </div>
             {otherOnlineUsers.length > 0 && (
-              <div style={styles.onlineBadge}>
-                <span style={styles.onlineDot}>●</span>
-                <span style={styles.onlineText}>{otherOnlineUsers.join(", ")} online</span>
+              <div className="online-badge">
+                <span className="online-dot">●</span>
+                <span>{otherOnlineUsers.join(", ")} online</span>
               </div>
             )}
           </div>
@@ -556,18 +558,18 @@ export default function App() {
 
       {/* Tag Selection Modal */}
       {showTagModal && (
-        <div style={styles.modalOverlay} onClick={() => setShowTagModal(false)}>
-          <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
-            <h3 style={styles.modalTitle}>
-              🏷️ Pick a tag for<br />"{pendingItemName}"
+        <div className="modal-overlay" onClick={() => setShowTagModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <h3 className="modal-title">
+              🏷️ Izaberi tag za<br />"{pendingItemName}"
             </h3>
             
-            <div style={styles.tagGrid}>
+            <div className="tag-grid">
               {Object.entries(availableTags).map(([tagName, color]) => (
                 <button
                   key={tagName}
+                  className={`tag-option ${selectedTag === tagName ? 'selected' : ''}`}
                   style={{
-                    ...styles.tagOption,
                     backgroundColor: selectedTag === tagName ? color : "white",
                     color: selectedTag === tagName ? "white" : color,
                     borderColor: color,
@@ -580,29 +582,29 @@ export default function App() {
             </div>
 
             {!showAddTag ? (
-              <button style={styles.addNewTagButton} onClick={() => setShowAddTag(true)}>
-                ✨ Create New Tag
+              <button className="add-new-tag-btn" onClick={() => setShowAddTag(true)}>
+                ✨ Napravi novi Tag
               </button>
             ) : (
-              <div style={styles.newTagForm}>
+              <div className="new-tag-form">
                 <input
                   type="text"
                   placeholder="Tag name"
                   value={newTagName}
                   onChange={(e) => setNewTagName(e.target.value)}
-                  style={styles.newTagInput}
+                  className="new-tag-input"
                 />
                 <input
                   type="color"
                   value={newTagColor}
                   onChange={(e) => setNewTagColor(e.target.value)}
-                  style={styles.colorPicker}
+                  className="color-picker"
                 />
-                <div style={styles.newTagActions}>
-                  <button style={styles.saveTagButton} onClick={addCustomTag}>
+                <div className="new-tag-actions">
+                  <button className="save-tag-btn" onClick={addCustomTag}>
                     Save
                   </button>
-                  <button style={styles.cancelTagButton} onClick={() => {
+                  <button className="cancel-tag-btn" onClick={() => {
                     setShowAddTag(false);
                     setNewTagName("");
                     setNewTagColor("#FFB347");
@@ -613,26 +615,23 @@ export default function App() {
               </div>
             )}
 
-            <div style={styles.modalActions}>
+            <div className="modal-actions">
               <button 
-                style={styles.cancelButton} 
+                className="cancel-btn" 
                 onClick={() => {
                   setShowTagModal(false);
                   setShowAddTag(false);
                   setNewTagName("");
                 }}
               >
-                Maybe Later
+                Odustani
               </button>
               <button 
-                style={{
-                  ...styles.confirmButton,
-                  opacity: !selectedTag ? 0.5 : 1,
-                }}
+                className="confirm-btn"
                 onClick={confirmAddItem}
                 disabled={!selectedTag}
               >
-                Add to List ✨
+                Dodaj
               </button>
             </div>
           </div>
@@ -641,42 +640,39 @@ export default function App() {
 
       {/* Main Content */}
       {currentPage === "shopping" && (
-        <div style={styles.shoppingContent}>
+        <div className="shopping-content">
           {/* Left Column - Kupiti */}
-          <div style={styles.column}>
-            <div style={styles.columnHeader}>
-              <h2 style={styles.header}>
-                <span style={styles.headerEmoji}>🛒</span>
+          <div className="column">
+            <div className="column-header">
+              <h2 className="column-title">
+                <span className="title-emoji">🛒</span>
                 Kupiti
               </h2>
-              <span style={styles.countBadge}>{kupitiCount}</span>
+              <span className="count-badge">{kupitiCount}</span>
             </div>
-            <div style={styles.listContainer}>
+            <div className="list-container">
               {Object.keys(kupitiGrouped).length === 0 ? (
-                <div style={styles.emptyState}>
-                  <span style={styles.emptyEmoji}>🎉</span>
-                  <p>Nothing to buy!<br />Time to relax!</p>
+                <div className="empty-state">
+                  <span className="empty-emoji">🎉</span>
+                  <p>Prazno!<br />Cestitam!</p>
                 </div>
               ) : (
                 Object.entries(kupitiGrouped).map(([tag, items]) => (
-                  <div key={tag} style={styles.tagGroup}>
-                    <div style={styles.tagHeader}>
-                      <span style={{
-                        ...styles.tagChip,
-                        backgroundColor: availableTags[tag] || "#FFB347",
-                      }}>
+                  <div key={tag} className="tag-group">
+                    <div className="tag-header">
+                      <span
+                        className="tag-chip"
+                        style={{ backgroundColor: availableTags[tag] || "#FFB347" }}
+                      >
                         {tag}
                       </span>
-                      <span style={styles.tagCount}>{items.length}</span>
+                      <span className="tag-count">{items.length}</span>
                     </div>
-                    <div style={styles.itemList}>
+                    <div className="item-list">
                       {items.map((item) => (
                         <div
                           key={item.id}
-                          style={{
-                            ...styles.itemCard,
-                            animation: animatingItems.has(item.id) ? "bounceIn 0.4s ease-out" : "none",
-                          }}
+                          className={`item-card ${animatingItems.has(item.id) ? 'animate-in' : ''}`}
                           onClick={() =>
                             moveItem(
                               item.id,
@@ -691,16 +687,16 @@ export default function App() {
                             )
                           }
                         >
-                          <div style={styles.itemContent}>
-                            <span style={styles.itemName}>{item.name}</span>
-                            <span style={styles.itemMeta}>
+                          <div className="item-content">
+                            <span className="item-name">{item.name}</span>
+                            <span className="item-meta">
                               by <span style={{ color: USER_COLORS[item.addedBy] || "#FF8A5C" }}>
                                 {item.addedBy}
                               </span>
                             </span>
                           </div>
                           <button
-                            style={styles.deleteButton}
+                            className="delete-btn"
                             onClick={(e) => {
                               e.stopPropagation();
                               deleteItem(item.id, "kupiti", item.name);
@@ -718,52 +714,49 @@ export default function App() {
           </div>
 
           {/* Right Column - Imamo */}
-          <div style={styles.column}>
-            <div style={styles.columnHeader}>
-              <h2 style={styles.header}>
-                <span style={styles.headerEmoji}>✅</span>
+          <div className="column">
+            <div className="column-header">
+              <h2 className="column-title">
+                <span className="title-emoji">✅</span>
                 Imamo
               </h2>
-              <span style={styles.countBadge}>{imamoCount}</span>
+              <span className="count-badge">{imamoCount}</span>
             </div>
-            <div style={styles.listContainer}>
+            <div className="list-container">
               {Object.keys(imamoGrouped).length === 0 ? (
-                <div style={styles.emptyState}>
-                  <span style={styles.emptyEmoji}>🛍️</span>
-                  <p>Your list is empty!<br />Time to shop!</p>
+                <div className="empty-state">
+                  <span className="empty-emoji">🛍️</span>
+                  <p>Lista je prazna!<br />Vreme je za kupovinu!</p>
                 </div>
               ) : (
                 Object.entries(imamoGrouped).map(([tag, items]) => (
-                  <div key={tag} style={styles.tagGroup}>
-                    <div style={styles.tagHeader}>
-                      <span style={{
-                        ...styles.tagChip,
-                        backgroundColor: availableTags[tag] || "#FFB347",
-                      }}>
+                  <div key={tag} className="tag-group">
+                    <div className="tag-header">
+                      <span
+                        className="tag-chip"
+                        style={{ backgroundColor: availableTags[tag] || "#FFB347" }}
+                      >
                         {tag}
                       </span>
-                      <span style={styles.tagCount}>{items.length}</span>
+                      <span className="tag-count">{items.length}</span>
                     </div>
-                    <div style={styles.itemList}>
+                    <div className="item-list">
                       {items.map((item) => (
                         <div
                           key={item.id}
-                          style={{
-                            ...styles.itemCard,
-                            animation: animatingItems.has(item.id) ? "bounceIn 0.4s ease-out" : "none",
-                          }}
+                          className={`item-card ${animatingItems.has(item.id) ? 'animate-in' : ''}`}
                           onClick={() => moveItem(item.id, { name: item.name, addedBy: item.addedBy, addedAt: item.addedAt, tag: item.tag }, "imamo", "kupiti")}
                         >
-                          <div style={styles.itemContent}>
-                            <span style={styles.itemName}>{item.name}</span>
-                            <span style={styles.itemMeta}>
+                          <div className="item-content">
+                            <span className="item-name">{item.name}</span>
+                            <span className="item-meta">
                               by <span style={{ color: USER_COLORS[item.addedBy] || "#FF8A5C" }}>
                                 {item.addedBy}
                               </span>
                             </span>
                           </div>
                           <button
-                            style={styles.deleteButton}
+                            className="delete-btn"
                             onClick={(e) => {
                               e.stopPropagation();
                               deleteItem(item.id, "imamo", item.name);
@@ -784,18 +777,20 @@ export default function App() {
 
       {/* Kuhinjica Page */}
       {currentPage === "kuhinjica" && (
-        <div style={styles.recipesContent}>
+        <div className="recipes-content">
           {Object.entries(recipes).map(([id, recipe]) => (
-            <div key={id} style={styles.recipeCard}>
+            <div key={id} className="recipe-card">
               <img
                 src={recipe.image}
                 alt={recipe.name}
-                style={styles.recipeImage}
+                className="recipe-image"
               />
-              <h3 style={styles.recipeTitle}>{recipe.name}</h3>
+              <h3 className="recipe-title">{recipe.name}</h3>
 
-              <div style={styles.ingredientsSection}>
-                <h4 style={styles.ingredientsTitle}>🧂 Ingredients</h4>
+              <div className="ingredients-section">
+                <h4 className="ingredients-title">
+                  <span>🧂</span> Sastojci
+                </h4>
                 {Object.entries(recipe.ingredients || {}).map(([ing, data]) => {
                   const ingredientStatuses = getRecipeIngredientStatus(recipe.ingredients);
                   const status = ingredientStatuses[ing];
@@ -803,14 +798,11 @@ export default function App() {
                   return (
                     <div
                       key={ing}
-                      style={{
-                        ...styles.ingredientItem,
-                        ...styles[`ingredient${status.charAt(0).toUpperCase() + status.slice(1)}`]
-                      }}
+                      className={`ingredient-item ingredient-${status}`}
                     >
                       <span>{ing}</span>
-                      <span style={styles.ingredientQuantity}>({data.quantity})</span>
-                      <span style={styles.ingredientIcon}>
+                      <span className="ingredient-quantity">({data.quantity})</span>
+                      <span className="ingredient-icon">
                         {status === "have" && "✅"}
                         {status === "buy" && "🛒"}
                         {status === "missing" && "❌"}
@@ -823,12 +815,12 @@ export default function App() {
               <textarea
                 value={recipe.description || ""}
                 onChange={(e) => updateRecipeDescription(id, e.target.value, recipe)}
-                placeholder="📝 Add cooking notes..."
-                style={styles.textarea}
+                placeholder="📝 Dodaj opis..."
+                className="recipe-textarea"
               />
 
-              <div style={styles.recipeFooter}>
-                <small style={styles.editInfo}>
+              <div className="recipe-footer">
+                <small className="edit-info">
                   Last edit: {recipe.lastEditedBy || "unknown"} •{" "}
                   {recipe.lastEditedAt
                     ? new Date(recipe.lastEditedAt).toLocaleDateString()
@@ -841,714 +833,54 @@ export default function App() {
       )}
 
       {/* Bottom Navigation */}
-      <div style={styles.bottomNav}>
+      <div className="bottom-nav">
         <button
-          style={{
-            ...styles.navButton,
-            ...(currentPage === "shopping" ? styles.navButtonActive : {})
-          }}
+          className={`nav-btn ${currentPage === "shopping" ? "active" : ""}`}
           onClick={() => setCurrentPage("shopping")}
         >
-          <span style={styles.navIcon}>🛒</span>
-          <span style={styles.navLabel}>Lista</span>
+          <span className="nav-icon">🛒</span>
+          <span className="nav-label">Lista</span>
         </button>
 
         <button
-          style={{
-            ...styles.navButton,
-            ...(currentPage === "kuhinjica" ? styles.navButtonActive : {})
-          }}
+          className={`nav-btn ${currentPage === "kuhinjica" ? "active" : ""}`}
           onClick={() => setCurrentPage("kuhinjica")}
         >
-          <span style={styles.navIcon}>🍳</span>
-          <span style={styles.navLabel}>Kuhinjica</span>
+          <span className="nav-icon">🍳</span>
+          <span className="nav-label">Kuhinjica</span>
         </button>
 
         <button
-          style={styles.navButton}
+          className="nav-btn"
           onClick={handleLogout}
         >
-          <span style={styles.navIcon}>❌</span>
-          <span style={styles.navLabel}>Exit</span>
+          <span className="nav-icon">❌</span>
+          <span className="nav-label">Exit</span>
         </button>
       </div>
 
       {/* Add Item Bar */}
-      <div style={styles.addBar}>
+      <div className="add-bar">
         <input
+          className="add-input"
           type="text"
           value={newItem}
-          placeholder="Add bananas, milk, bread..."
+          placeholder="Dodaj mleko, jaja..."
           onChange={(e) => setNewItem(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter") {
               initiateAddItem();
             }
-          }}
-          style={styles.addInput}
+          }}          
         />
         <button
-          style={styles.addButton}
+          className="add-btn"
           onClick={initiateAddItem}
           disabled={!newItem.trim()}
         >
-          <span style={styles.addButtonText}>+</span>
+          <span className="add-btn-text">+</span>
         </button>
       </div>
     </div>
   );
 }
-
-const styles = {
-  page: {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    minHeight: "100vh",
-    background: "linear-gradient(135deg, #FFF9E6 0%, #FFE8D6 100%)",
-    padding: "0",
-    paddingTop: "4rem",
-    paddingBottom: "7rem",
-    fontFamily: "'Poppins', -apple-system, BlinkMacSystemFont, sans-serif",
-  },
-  fixedBannerContainer: {
-    position: "fixed",
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 1000,
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    padding: "0.5rem",
-    gap: "0.5rem",
-    pointerEvents: "none",
-  },
-  loadingContainer: {
-    display: "flex",
-    flexDirection: "column",
-    justifyContent: "center",
-    alignItems: "center",
-    minHeight: "100vh",
-    background: "linear-gradient(135deg, #FFF9E6 0%, #FFE8D6 100%)",
-  },
-  spinner: {
-    width: "50px",
-    height: "50px",
-    border: "4px solid rgba(255, 107, 107, 0.2)",
-    borderTop: "4px solid #FF6B6B",
-    borderRadius: "50%",
-    animation: "spin 1s linear infinite",
-    marginBottom: "1rem",
-  },
-  loadingText: {
-    fontSize: "1.2rem",
-    color: "#FF8A5C",
-    fontWeight: "600",
-  },
-  topBar: {
-    position: "fixed",
-    top: "0",
-    left: "0",
-    right: "0",
-    width: "100%",
-    backgroundColor: "rgba(255, 255, 255, 0.9)",
-    backdropFilter: "blur(10px)",
-    borderBottom: "1px solid rgba(255, 107, 107, 0.2)",
-    boxShadow: "0 4px 20px rgba(255, 107, 107, 0.1)",
-    zIndex: 999,
-  },
-  navContainer: {
-    padding: "0.75rem 1rem",
-  },
-  userInfo: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  welcomeText: {
-    display: "flex",
-    alignItems: "center",
-    gap: "0.5rem",
-  },
-  welcomeEmoji: {
-    fontSize: "1.2rem",
-  },
-  username: {
-    fontSize: "1rem",
-    fontWeight: "700",
-    background: "linear-gradient(135deg, #FF6B6B, #FF8A5C)",
-    WebkitBackgroundClip: "text",
-    WebkitTextFillColor: "transparent",
-  },
-  onlineBadge: {
-    display: "flex",
-    alignItems: "center",
-    gap: "0.25rem",
-    padding: "0.25rem 0.75rem",
-    backgroundColor: "#A8E6CF",
-    borderRadius: "20px",
-  },
-  onlineDot: {
-    color: "#2ecc71",
-    fontSize: "0.8rem",
-  },
-  onlineText: {
-    fontSize: "0.8rem",
-    color: "#2c3e50",
-    fontWeight: "500",
-  },
-  errorBanner: {
-    width: "90%",
-    maxWidth: "400px",
-    padding: "0.75rem 1rem",
-    backgroundColor: "#FFE5E5",
-    border: "1px solid #FF6B6B",
-    borderRadius: "12px",
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    color: "#FF6B6B",
-    fontSize: "0.9rem",
-    animation: "slideIn 0.3s ease-out",
-    boxShadow: "0 4px 12px rgba(255, 107, 107, 0.2)",
-    pointerEvents: "auto",
-  },
-  undoBanner: {
-    width: "90%",
-    maxWidth: "400px",
-    padding: "0.75rem 1rem",
-    backgroundColor: "#E5F6FF",
-    border: "1px solid #4ECDC4",
-    borderRadius: "12px",
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    color: "#4ECDC4",
-    fontSize: "0.9rem",
-    animation: "slideIn 0.3s ease-out",
-    boxShadow: "0 4px 12px rgba(78, 205, 196, 0.2)",
-    pointerEvents: "auto",
-  },
-  undoButton: {
-    padding: "0.4rem 1rem",
-    backgroundColor: "#4ECDC4",
-    color: "white",
-    border: "none",
-    borderRadius: "20px",
-    cursor: "pointer",
-    fontSize: "0.85rem",
-    fontWeight: "600",
-    transition: "all 0.2s",
-  },
-  closeError: {
-    background: "none",
-    border: "none",
-    color: "#FF6B6B",
-    cursor: "pointer",
-    fontSize: "1rem",
-    padding: "0",
-  },
-  modalOverlay: {
-    position: "fixed",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-    zIndex: 2000,
-    padding: "1rem",
-  },
-  modalContent: {
-    backgroundColor: "white",
-    borderRadius: "24px",
-    padding: "1.5rem",
-    maxWidth: "400px",
-    width: "100%",
-    boxShadow: "0 20px 40px rgba(255, 107, 107, 0.2)",
-  },
-  modalTitle: {
-    fontSize: "1.3rem",
-    fontWeight: "700",
-    marginBottom: "1.5rem",
-    color: "#FF8A5C",
-    textAlign: "center",
-    lineHeight: "1.4",
-  },
-  tagGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))",
-    gap: "0.5rem",
-    marginBottom: "1rem",
-  },
-  tagOption: {
-    padding: "0.6rem",
-    borderRadius: "20px",
-    border: "2px solid",
-    cursor: "pointer",
-    fontSize: "0.85rem",
-    fontWeight: "600",
-    textAlign: "center",
-    transition: "all 0.2s",
-  },
-  addNewTagButton: {
-    width: "100%",
-    padding: "0.75rem",
-    backgroundColor: "#FFF9E6",
-    color: "#FF8A5C",
-    border: "2px dashed #FFB347",
-    borderRadius: "12px",
-    cursor: "pointer",
-    fontSize: "0.9rem",
-    fontWeight: "600",
-    marginBottom: "1rem",
-    transition: "all 0.2s",
-  },
-  newTagForm: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "0.75rem",
-    marginBottom: "1rem",
-  },
-  newTagInput: {
-    width: "100%",
-    padding: "0.75rem",
-    border: "2px solid #FFE8D6",
-    borderRadius: "12px",
-    fontSize: "0.9rem",
-  },
-  colorPicker: {
-    width: "100%",
-    height: "44px",
-    border: "2px solid #FFE8D6",
-    borderRadius: "12px",
-    cursor: "pointer",
-  },
-  newTagActions: {
-    display: "flex",
-    gap: "0.5rem",
-  },
-  saveTagButton: {
-    flex: 1,
-    padding: "0.6rem",
-    backgroundColor: "#4ECDC4",
-    color: "white",
-    border: "none",
-    borderRadius: "12px",
-    cursor: "pointer",
-    fontSize: "0.9rem",
-    fontWeight: "600",
-  },
-  cancelTagButton: {
-    flex: 1,
-    padding: "0.6rem",
-    backgroundColor: "#FFE5E5",
-    color: "#FF6B6B",
-    border: "none",
-    borderRadius: "12px",
-    cursor: "pointer",
-    fontSize: "0.9rem",
-    fontWeight: "600",
-  },
-  modalActions: {
-    display: "flex",
-    gap: "0.75rem",
-    marginTop: "1rem",
-  },
-  cancelButton: {
-    flex: 1,
-    padding: "0.75rem",
-    backgroundColor: "#f0f0f0",
-    color: "#666",
-    border: "none",
-    borderRadius: "12px",
-    cursor: "pointer",
-    fontSize: "0.9rem",
-    fontWeight: "600",
-  },
-  confirmButton: {
-    flex: 1,
-    padding: "0.75rem",
-    background: "linear-gradient(135deg, #FF6B6B, #FF8A5C)",
-    color: "white",
-    border: "none",
-    borderRadius: "12px",
-    cursor: "pointer",
-    fontSize: "0.9rem",
-    fontWeight: "600",
-  },
-  shoppingContent: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "1.5rem",
-    width: "100%",
-    maxWidth: "500px",
-    padding: "1rem",
-  },
-  column: {
-    width: "100%",
-  },
-  columnHeader: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: "0.75rem",
-    padding: "0 0.5rem",
-  },
-  header: {
-    fontSize: "1.4rem",
-    fontWeight: "700",
-    color: "#FF6B6B",
-    display: "flex",
-    alignItems: "center",
-    gap: "0.5rem",
-  },
-  headerEmoji: {
-    fontSize: "1.8rem",
-  },
-  countBadge: {
-    backgroundColor: "white",
-    padding: "0.25rem 0.75rem",
-    borderRadius: "20px",
-    fontSize: "1rem",
-    fontWeight: "700",
-    color: "#FF8A5C",
-    boxShadow: "0 2px 8px rgba(255, 107, 107, 0.1)",
-  },
-  listContainer: {
-    backgroundColor: "white",
-    borderRadius: "20px",
-    padding: "1rem",
-    boxShadow: "0 8px 20px rgba(255, 107, 107, 0.1)",
-  },
-  tagGroup: {
-    marginBottom: "1.5rem",
-  },
-  tagHeader: {
-    display: "flex",
-    alignItems: "center",
-    gap: "0.5rem",
-    marginBottom: "0.75rem",
-  },
-  tagChip: {
-    padding: "0.3rem 1rem",
-    borderRadius: "20px",
-    color: "white",
-    fontSize: "0.85rem",
-    fontWeight: "600",
-  },
-  tagCount: {
-    fontSize: "0.8rem",
-    color: "#999",
-    fontWeight: "500",
-  },
-  itemList: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "0.5rem",
-  },
-  itemCard: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: "0.75rem",
-    backgroundColor: "#FFF9E6",
-    borderRadius: "12px",
-    border: "1px solid #FFE8D6",
-    cursor: "pointer",
-    transition: "all 0.2s",
-  },
-  itemContent: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "0.25rem",
-  },
-  itemName: {
-    fontSize: "1rem",
-    fontWeight: "600",
-    color: "#2c3e50",
-  },
-  itemMeta: {
-    fontSize: "0.7rem",
-    color: "#95a5a6",
-  },
-  deleteButton: {
-    width: "32px",
-    height: "32px",
-    backgroundColor: "transparent",
-    color: "#FF6B6B",
-    border: "none",
-    borderRadius: "50%",
-    fontSize: "1.2rem",
-    cursor: "pointer",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    transition: "all 0.2s",
-  },
-  emptyState: {
-    padding: "2rem 1rem",
-    textAlign: "center",
-    color: "#FFB347",
-    fontSize: "1rem",
-    fontWeight: "500",
-  },
-  emptyEmoji: {
-    fontSize: "2.5rem",
-    display: "block",
-    marginBottom: "0.5rem",
-  },
-  recipesContent: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "1rem",
-    width: "100%",
-    maxWidth: "500px",
-    padding: "1rem",
-  },
-  recipeCard: {
-    backgroundColor: "white",
-    borderRadius: "24px",
-    padding: "1.5rem",
-    boxShadow: "0 8px 20px rgba(255, 107, 107, 0.1)",
-    border: "1px solid #FFE8D6",
-  },
-  recipeImage: {
-    width: "100%",
-    height: "200px",
-    objectFit: "cover",
-    borderRadius: "16px",
-    marginBottom: "1rem",
-  },
-  recipeTitle: {
-    fontSize: "1.3rem",
-    fontWeight: "700",
-    color: "#FF6B6B",
-    marginBottom: "1rem",
-  },
-  ingredientsSection: {
-    marginBottom: "1rem",
-  },
-  ingredientsTitle: {
-    fontSize: "1rem",
-    fontWeight: "600",
-    color: "#FF8A5C",
-    marginBottom: "0.5rem",
-  },
-  ingredientItem: {
-    display: "flex",
-    alignItems: "center",
-    gap: "0.5rem",
-    padding: "0.5rem",
-    marginBottom: "0.25rem",
-    borderRadius: "10px",
-    fontSize: "0.9rem",
-  },
-  ingredientQuantity: {
-    color: "#95a5a6",
-    fontSize: "0.8rem",
-  },
-  ingredientIcon: {
-    marginLeft: "auto",
-  },
-  ingredientHave: {
-    backgroundColor: "#E8F8F5",
-  },
-  ingredientBuy: {
-    backgroundColor: "#FFF5E6",
-  },
-  ingredientMissing: {
-    backgroundColor: "#FFE5E5",
-  },
-  textarea: {
-    width: "100%",
-    marginTop: "0.5rem",
-    borderRadius: "12px",
-    padding: "0.75rem",
-    border: "2px solid #FFE8D6",
-    minHeight: "80px",
-    fontSize: "0.9rem",
-    fontFamily: "inherit",
-  },
-  recipeFooter: {
-    marginTop: "1rem",
-    paddingTop: "0.5rem",
-    borderTop: "1px solid #FFE8D6",
-  },
-  editInfo: {
-    color: "#95a5a6",
-    fontSize: "0.7rem",
-  },
-  bottomNav: {
-    position: "fixed",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    display: "flex",
-    justifyContent: "space-around",
-    padding: "0.75rem 1rem",
-    backgroundColor: "rgba(255, 255, 255, 0.9)",
-    backdropFilter: "blur(10px)",
-    borderTop: "1px solid rgba(255, 107, 107, 0.2)",
-    boxShadow: "0 -4px 20px rgba(255, 107, 107, 0.1)",
-    zIndex: 999,
-  },
-  navButton: {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    gap: "0.25rem",
-    padding: "0.5rem 1.5rem",
-    border: "none",
-    borderRadius: "20px",
-    cursor: "pointer",
-    fontSize: "0.8rem",
-    fontWeight: "600",
-    transition: "all 0.2s",
-    backgroundColor: "transparent",
-    color: "#666",
-  },
-  navButtonActive: {
-    background: "linear-gradient(135deg, #FF6B6B20, #FF8A5C20)",
-    color: "#FF6B6B",
-  },
-  navIcon: {
-    fontSize: "1.4rem",
-  },
-  navLabel: {
-    fontSize: "0.7rem",
-  },
-  addBar: {
-    position: "fixed",
-    bottom: "5rem",
-    left: "50%",
-    transform: "translateX(-50%)",
-    display: "flex",
-    gap: "0.5rem",
-    padding: "0.5rem",
-    backgroundColor: "white",
-    borderRadius: "30px",
-    boxShadow: "0 8px 25px rgba(255, 107, 107, 0.2)",
-    border: "2px solid #FFE8D6",
-    width: "90%",
-    maxWidth: "450px",
-  },
-  addInput: {
-    flex: 1,
-    padding: "0.8rem 1rem",
-    border: "none",
-    borderRadius: "30px",
-    fontSize: "0.95rem",
-    outline: "none",
-    backgroundColor: "transparent",
-  },
-  addButton: {
-    width: "44px",
-    height: "44px",
-    background: "linear-gradient(135deg, #FF6B6B, #FF8A5C)",
-    color: "white",
-    border: "none",
-    borderRadius: "50%",
-    cursor: "pointer",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    transition: "all 0.2s",
-    boxShadow: "0 4px 12px rgba(255, 107, 107, 0.3)",
-  },
-  addButtonText: {
-    fontSize: "1.5rem",
-    fontWeight: "600",
-    lineHeight: "1",
-  },
-};
-
-// Add global styles and animations
-const globalStyles = document.createElement('style');
-globalStyles.textContent = `
-  @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
-
-  @keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-  }
-
-  @keyframes slideIn {
-    from {
-      transform: translateY(-100%);
-      opacity: 0;
-    }
-    to {
-      transform: translateY(0);
-      opacity: 1;
-    }
-  }
-
-  @keyframes bounceIn {
-    0% {
-      transform: scale(0.3);
-      opacity: 0;
-    }
-    50% {
-      transform: scale(1.05);
-    }
-    70% {
-      transform: scale(0.9);
-    }
-    100% {
-      transform: scale(1);
-      opacity: 1;
-    }
-  }
-
-  * {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
-  }
-
-  body {
-    font-family: 'Poppins', sans-serif;
-    -webkit-tap-highlight-color: transparent;
-  }
-
-  input, button, textarea {
-    font-family: inherit;
-  }
-
-  button:hover {
-    opacity: 0.9;
-  }
-
-  button:active {
-    transform: scale(0.98);
-  }
-
-  input:focus {
-    outline: none;
-  }
-
-  ::placeholder {
-    color: #FFB347;
-    opacity: 0.6;
-  }
-
-  /* Mobile optimizations */
-  @media (max-width: 480px) {
-    .shopping-content {
-      padding: 0.5rem;
-    }
-    
-    .item-card {
-      padding: 0.6rem;
-    }
-    
-    .nav-button {
-      padding: 0.5rem 1rem;
-    }
-  }
-`;
-document.head.appendChild(globalStyles);
