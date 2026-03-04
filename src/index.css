@@ -727,6 +727,7 @@ input:focus, textarea:focus {
   width: 90%;
   max-width: 450px;
   animation: slideIn 0.3s ease-out;
+  align-items: center; /* Ensure vertical alignment */
 }
 
 .add-input {
@@ -737,21 +738,27 @@ input:focus, textarea:focus {
   font-size: 0.95rem;
   outline: none;
   background-color: transparent;
+  min-height: 44px; /* Minimum touch target size */
 }
 
 .add-btn {
   width: 44px;
   height: 44px;
+  min-width: 44px; /* Prevent shrinking */
+  min-height: 44px; /* Prevent shrinking */
   background: linear-gradient(135deg, #FF6B6B, #FF8A5C);
   color: white;
   border: none;
-  border-radius: 50%;
+  border-radius: 50%; /* Always 50% for perfect circle */
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   transition: all 0.2s;
   box-shadow: 0 4px 12px rgba(255, 107, 107, 0.3);
+  padding: 0; /* Remove any default padding */
+  flex-shrink: 0; /* Prevent flex shrinking */
+  aspect-ratio: 1 / 1; /* Force perfect square aspect ratio */
 }
 
 .add-btn:disabled {
@@ -764,10 +771,20 @@ input:focus, textarea:focus {
   transform: rotate(90deg);
 }
 
+.add-btn:not(:disabled):active {
+  transform: scale(0.95);
+}
+
 .add-btn-text {
-  font-size: 1.5rem;
+  font-size: 1.8rem; /* Slightly larger */
   font-weight: 600;
   line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  text-align: center;
 }
 
 /* ===== LOADING STATES ===== */
@@ -906,4 +923,42 @@ input:focus, textarea:focus {
 
 .rounded-2xl {
   border-radius: 24px;
+}
+
+/* Additional mobile-specific fixes */
+@media (max-width: 480px) {
+  .add-bar {
+    padding: 0.4rem; /* Slightly smaller padding on mobile */
+  }
+  
+  .add-input {
+    padding: 0.6rem 0.8rem;
+    font-size: 0.9rem;
+    min-height: 40px;
+  }
+  
+  .add-btn {
+    width: 40px;
+    height: 40px;
+    min-width: 40px;
+    min-height: 40px;
+  }
+  
+  .add-btn-text {
+    font-size: 1.6rem;
+  }
+}
+
+/* Fix for very small screens */
+@media (max-width: 360px) {
+  .add-btn {
+    width: 38px;
+    height: 38px;
+    min-width: 38px;
+    min-height: 38px;
+  }
+  
+  .add-btn-text {
+    font-size: 1.5rem;
+  }
 }
